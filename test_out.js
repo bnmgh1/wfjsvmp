@@ -1,0 +1,1 @@
+console.log(String.fromCharCode.apply(undefined, [99, 99, 99]));
