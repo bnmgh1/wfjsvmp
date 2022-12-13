@@ -138,6 +138,7 @@ const deleteConsole = {
         }
     }
 }
+
 /* if else 转三元 或者 && || 这样的 有点问题 先放着*/
 // const ifToConditional = {
 //     IfStatement(path) {
@@ -156,26 +157,24 @@ const deleteConsole = {
 //         }
 //     }
 // }
+const {changeAccessModule} = require('./ob_module/changeAccess');
 
-// const aaa = {
-//     FunctionDeclaration(path) {
-//         var body = path.node.body.body;
-//         var ret = type.identifier("ret");
-//         var var_ret = type.variableDeclaration("var", [type.variableDeclarator(ret)]);
-//         path.traverse({
-//             ReturnStatement(p) {
-//                 p.replaceWith(type.expressionStatement(type.assignmentExpression("=", ret, p.node.argument)));
-//             }
-//         });
-//         var return_node = type.returnStatement(ret);
-//         body.unshift(var_ret);
-//         body.push(return_node);
-//     }
-// }
+/* 这几个之前写的全都有bug */
+const {deadCodeModule} = require('./ob_module/deadCode');
+const {junkCodeModule} = require('./ob_module/junkCode');
+const {controlFlowModule} = require('./ob_module/controlFlow');
+
+
 traverse(ast, decodeObject);
 traverse(ast, deleteCommentLine);
 traverse(ast, switchToIf);
 traverse(ast, deleteConsole);
+
+traverse(ast, changeAccessModule);
+traverse(ast, junkCodeModule);
+// traverse(ast, deadCodeModule);
+
+
 // traverse(ast, ifToConditional);
 // traverse(ast, aaa);
 // console.log(generator(ast).code);

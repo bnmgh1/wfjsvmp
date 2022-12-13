@@ -49,7 +49,7 @@ var OPCODE = {
     IS_TRUE: 89,
     SKIP_BLOCK: 90,
     GOTO: 91, // 跳转到循环头位置
-    BREAK: 92, // break, 正常的思路应该是break出一段代码的. 写不出来, 我长度获取不到.
+    BREAK: 92, // break, 正常的思路应该是break出一段代码的.
     CONTINUE: 93, // continue
 
 }
@@ -77,6 +77,7 @@ function backfill_opcode(opcode, mode, replace_code) {
     }
     return opcode;
 }
+
 /* 回填break */
 function backfill_break(opcode) {
     var index;
@@ -91,6 +92,7 @@ function backfill_break(opcode) {
     }
     return opcode;
 }
+
 /* for 循环 continue */
 function backfill_continue_for(opcode) {
     var index;
@@ -110,6 +112,7 @@ function backfill_continue_for(opcode) {
     opcode.splice(continue_postion, 1);
     return opcode;
 }
+
 /* 回填continue */
 function backfill_continue(opcode) {
     var index;
@@ -124,6 +127,7 @@ function backfill_continue(opcode) {
     }
     return opcode;
 }
+
 /* 字符串转数字数组 */
 function strToNumArr(str) {
     return str.split("").map((str) => {
@@ -139,12 +143,12 @@ function strToOpcode(str) {
     opcode = opcode.concat(str_opcode);
     return opcode;
 }
+
 /* push update_stack 指令. */
 function push_update_stack(opcode, node) {
     if ("VariableDeclarator|ConditionalExpression|WhileStatement" +
         "LogicalExpression|BinaryExpression|IfStatement" +
         "|UnaryExpression|CallExpression|ReturnStatement|AssignmentExpression".indexOf(node.parentPath.type) !== -1) {
-        // opcode = opcode.concat(generate(node.get("left")));
         opcode.push(OPCODE.UPDATE_STACK);
     }
     return opcode;
@@ -409,8 +413,9 @@ function generate(node) {
             /* if ((a = 1)) 这种的 怪恶心的 , 怎么判断是否会用到这个值
             *  */
             // opcode = push_update_stack(opcode, node);
-            opcode.push(OPCODE.UPDATE_STACK);
-
+            if (node.parentPath.type !== "ExpressionStatement") {
+                opcode.push(OPCODE.UPDATE_STACK);
+            }
             break
         case "BinaryExpression":
             opcode = opcode.concat(strToOpcode(node.node.operator));
@@ -505,8 +510,8 @@ function generate(node) {
                     break
                 default:
                     opcode.push(OPCODE.PUSH_NULL);
-                    // console.log("CallExpression 这里不知道要不要管 =>", node.get("callee").type)
-                    // debugger;
+                // console.log("CallExpression 这里不知道要不要管 =>", node.get("callee").type)
+                // debugger;
             }
             opcode.push(OPCODE.APPLY);
             break
@@ -619,6 +624,7 @@ function generate(node) {
                 all_block_opcode.push(OPCODE.IS_TRUE);
                 all_block_opcode.push(2);
             }
+
             // 这个时候true,就要运行goto,跳到block继续运行
             all_block_opcode.push(OPCODE.GOTO);
             all_block_opcode.push(all_block_opcode.length);
@@ -775,21 +781,22 @@ function generate(node) {
             break
         case "LogicalExpression":
             /* symbol */
-            /* _0x100 < 10 && _0x100 == 1 符号真应该最后用 */
             var left_opcode = generate(node.get("left"));
             var right_opcode = generate(node.get("right"));
             opcode = opcode.concat(left_opcode);
             opcode.push(OPCODE.IS_TRUE);
+            var parent_type = "ForStatement|LogicalExpression|AssignmentExpression|ConditionalExpression|VariableDeclarator" +
+                "|ObjectProperty|UnaryExpression|BinaryExpression|IfStatement|" +
+                "ReturnStatement|CallExpression|MemberExpression";
             switch (node.node.operator) {
                 case "&&":
                     /* var target = 1 && 2 */
-                    if ("AssignmentExpression|ConditionalExpression|VariableDeclarator" +
-                        "|ObjectProperty|UnaryExpression|BinaryExpression|IfStatement|" +
-                        "ReturnStatement|CallExpression".indexOf(node.parentPath.type) !== -1) {
+                    if (parent_type.indexOf(node.parentPath.type) !== -1) {
                         opcode.push(right_opcode.length + 2);
                         opcode = opcode.concat(right_opcode);
                         opcode.push(OPCODE.SKIP_BLOCK);
                         opcode.push(1);
+                        /* 如果为真,则继续往下走,然后这次的值或者对象就不放入变量池中,为假则让堆栈索引+1 */
                         opcode.push(OPCODE.UPDATE_STACK);
                     } else {
                         opcode.push(right_opcode.length);
@@ -797,9 +804,7 @@ function generate(node) {
                     }
                     break
                 case "||":
-                    if ("AssignmentExpression|ConditionalExpression|VariableDeclarator" +
-                        "|ObjectProperty|UnaryExpression|BinaryExpression|" +
-                        "IfStatement|ReturnStatement|CallExpression".indexOf(node.parentPath.type) !== -1) {
+                    if (parent_type.indexOf(node.parentPath.type) !== -1) {
                         opcode.push(2);
                         opcode.push(OPCODE.SKIP_BLOCK);
                         opcode.push(right_opcode.length + 2);
@@ -912,7 +917,6 @@ const forIn_to_for = {
         var right_node = path.node.right;
         var block_node = path.node.body;
         var left_node = path.node.left;
-        /* var zcj = Object.keys(b); 也是丢到for上面 这里zcj无法被重命名? 我无法理解 */
         var init_node = [];
         init_node.push(type.variableDeclarator(type.identifier("zcj"),
             type.conditionalExpression(
@@ -978,11 +982,31 @@ const arr_func_to_func = {
 const sequencing = {
     AssignmentExpression(path) {
         if (path.get("left").isMemberExpression() && path.get("left").get("object").isMemberExpression()
-        && path.get("left").get("object").get("object").isAssignmentExpression()){
+            && path.get("left").get("object").get("object").isAssignmentExpression()) {
             var assign = path.node.left.object.object;
             path.get("left").get("object").get("object").replaceWith(path.node.left.object.object.left);
             path.insertBefore(assign);
         }
+    }
+}
+/* `<div class="mm" ${a}style="transform: rotateY(${10 + 10 * iw}deg);">` => 字符串拼接 */
+const tempToStr = {
+    TemplateLiteral(path) {
+        var expressions = path.node.expressions;
+        var quasis = path.node.quasis;
+        if (quasis.length === 1) {
+            path.replaceWith(type.stringLiteral(quasis[i].value.raw));
+            path.skip();
+        }
+        var binaryExpression;
+        binaryExpression = type.binaryExpression("+", type.stringLiteral(quasis[0].value.raw), expressions[0]);
+        binaryExpression = type.binaryExpression("+", binaryExpression, type.stringLiteral(quasis[1].value.raw));
+        for (var i = 1; i < expressions.length; i++) {
+            binaryExpression = type.binaryExpression("+", binaryExpression, expressions[i]);
+            binaryExpression = type.binaryExpression("+", binaryExpression, type.stringLiteral(quasis[i + 1].value.raw));
+        }
+        path.replaceWith(type.ExpressionStatement(binaryExpression));
+        path.skip();
     }
 }
 /* 工具类放在后面 */
@@ -1123,6 +1147,7 @@ code = "console.log(String.fromCharCode.apply(undefined,[99,99,99]));"
 // code = fs.readFileSync("./jquery.js") + ''
 // code = fs.readFileSync("./md5.js") + ''
 // code = fs.readFileSync("./test_out.js") + ''
+code = fs.readFileSync("./test1.js") + ''
 // code = fs.readFileSync("./test.js") + ''
 var ast = parse(code);
 
@@ -1140,6 +1165,7 @@ const test = {
 // var a = +new Date();
 traverse(ast, arr_func_to_func);
 traverse(ast, change_obj_key);
+traverse(ast, tempToStr);
 for (var i = 0; i < 2; i++) {
     traverse(ast, num_to_express);
 }
@@ -1162,7 +1188,7 @@ fs.writeFileSync("./opcode.txt", JSON.stringify(opcode));
 // var opcode_str = opcode.map((item) =>{ return String.fromCharCode(item+32)}).join('');
 // fs.writeFileSync("./opcode.txt", opcode_str);
 
-fs.writeFileSync("./test_out.js", generator(ast).code);
+// fs.writeFileSync("./test_out.js", generator(ast).code);
 console.log(obj);
 
 for (var i in identifier_binding_track) {

@@ -1,7 +1,12 @@
+var {JSDOM} = require("jsdom");
+var {window} = new JSDOM(`<!DOCTYPE html><p>Hello world</p>`);
+global["window"] = window;
+window.document.readyState = "complete";
+fs = require("fs")
 // zcj_console = console.log;
 // console.log = function () {
 //     try{
-//         if (arguments[0].indexOf("typeof rootjQuery.ready") !== -1) {
+//         if (arguments[0] === window) {
 //         debugger
 //     }
 //     }
@@ -11,13 +16,6 @@
 //
 //     return zcj_console.apply(undefined, arguments);
 // }
-
-var {JSDOM} = require("jsdom");
-var {window} = new JSDOM(`<!DOCTYPE html><p>Hello world</p>`);
-global["window"] = window;
-window.document.readyState = "complete";
-fs = require("fs")
-
 var OPCODE = {
     PASS: 11, // 这是个无用字节码,不作任何操作
     PUSH_NUM: 12,
@@ -75,7 +73,7 @@ function vm_enter(opcode, index, constant, stack, obj_arr) {
         // result = opcode.slice(index, index + h).split("").map((opc) => {
         //     return opc.charCodeAt() - 32
         // });
-        result = bind.apply(vm_constant, [index, index + h]);
+        result = vbn.apply(vm_constant, [index, index + h]);
         index += h;
         return result;
     }
@@ -176,7 +174,7 @@ function vm_enter(opcode, index, constant, stack, obj_arr) {
             case "^=":
                 return opNum1 ^= opNum2
             case "|=":
-                return opNum1 ^= opNum2
+                return opNum1 |= opNum2
             case "in":
                 return opNum1 in opNum2
             case "instanceof":
@@ -205,7 +203,7 @@ function vm_enter(opcode, index, constant, stack, obj_arr) {
 
     var is_console = false;
     var opcode_slice = opcode.slice, opcode_slice_bind = opcode_slice.bind,
-        bind = opcode_slice_bind.apply(opcode_slice, [opcode]),
+        vbn = opcode_slice_bind.apply(opcode_slice, [opcode]),
         vm_stack, h, y, d, g, vm_esp = 0, vm_constant = constant;
     for (var i in obj_arr) {
         vm_constant[obj_arr[i]] = this["window"][obj_arr[i]];
@@ -224,6 +222,10 @@ function vm_enter(opcode, index, constant, stack, obj_arr) {
         // }
         // console.log(get_key(OPCODE, g));
         // g = opcode[index++];
+        if (vm_esp === -1){
+            console.log("堆栈索引都到-1了！！gg");
+            debugger;
+        }
 
         if (Number.isNaN(g) || !g) {
             break
@@ -398,7 +400,6 @@ function vm_enter(opcode, index, constant, stack, obj_arr) {
                     d = h.apply(y, d);
                 } else {
                     /*  方法  */
-
                     if (h.name === "toString") {
                         /* toString(16) */
                         if (d.length > 1) {
@@ -534,7 +535,7 @@ function vm_enter(opcode, index, constant, stack, obj_arr) {
                 }
                 break
             case OPCODE.UPDATE_STACK:
-                /* 把之前的值拿下来,覆盖掉现在的值 */
+                /* 把之前的值拿下来 */
                 vm_esp++;
                 break
             case OPCODE.DECREMENT_STACK:
@@ -553,7 +554,7 @@ function vm_enter(opcode, index, constant, stack, obj_arr) {
                 break
             default:
                 console.log("index => ", index, "opcode => err => ", g);
-                debugger
+                debugger;
         }
     }
 
@@ -562,91 +563,28 @@ function vm_enter(opcode, index, constant, stack, obj_arr) {
 opcode = eval(fs.readFileSync("./opcode.txt") + '')
 /* collect 存放for循环test 后 IS_TRUE的索引 */
 vm_enter(opcode, 0, {"$_jsvmp": true}, void 0, [
-        "document", 'console',
-        "Error",
-        "window",
-        "console",
-        "RegExp",
-        "length",
-        "name",
-        "Object",
-        "undefined",
-        "Math",
-        "Array",
-        "parseFloat",
-        "Date",
-        "String",
-        "parent",
-        "top",
-        "location",
-        "self",
-        "setTimeout",
-        "event",
-        "frameElement",
-        "stop",
-        "Event",
-        "focus",
-        "blur",
-        "close",
-        "getComputedStyle",
-        "setInterval",
-        "clearInterval",
-        "clearTimeout",
-        "parseInt",
-        "JSON",
-        "open",
-        "Function",
-        "DOMParser",
-        "status",
-        "encodeURIComponent",
-        "XMLHttpRequest",
-        "onload",
-        "pageYOffset",
-        "pageXOffset",
-        "scrollTo",
-        "document",
-        "Error",
-        "window",
-        "console",
-        "RegExp",
-        "length",
-        "name",
-        "Object",
-        "undefined",
-        "Math",
-        "Array",
-        "parseFloat",
-        "Date",
-        "String",
-        "parent",
-        "top",
-        "location",
-        "self",
-        "setTimeout",
-        "event",
-        "frameElement",
-        "stop",
-        "Event",
-        "focus",
-        "blur",
-        "close",
-        "getComputedStyle",
-        "setInterval",
-        "clearInterval",
-        "clearTimeout",
-        "parseInt",
-        "JSON",
-        "open",
-        "Function",
-        "DOMParser",
-        "status",
-        "encodeURIComponent",
-        "XMLHttpRequest",
-        "onload",
-        "pageYOffset",
-        "pageXOffset",
-        "scrollTo"
-    ]
+        'window', 'self',
+        'ArrayBuffer', 'Uint8Array',
+        'Uint32Array', 'Array',
+        'Object', 'length',
+        'crypto', 'eval',
+        'undefined', 'console'
+    ].concat([
+  'Math',
+  'undefined',
+  'console',
+  'Object',
+  'length',
+  'parseInt',
+  'JSON',
+  'String',
+  'decodeURIComponent',
+  'escape',
+  'Error',
+  'unescape',
+  'encodeURIComponent'
+])
 );
+// console.log(window.md5(''))
 
 
