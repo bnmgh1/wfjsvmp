@@ -85,7 +85,7 @@ const junkCodeModule = {
         // 保存path scope里的 二项式花指令函数
         let func_operator = {};
         // 保存path scope里的 方法调用花指令函数
-        let globalFuncNameIdentifier;
+        let globalFuncNameIdentifier = {};
         path.traverse({
                 BinaryExpression(path_) {
                     if (path_.getFunctionParent() === path) {
@@ -97,24 +97,12 @@ const junkCodeModule = {
                         let b = type.identifier("b");
                         let func;
                         let funcNameIdentifier;
-                        if (func_operator.hasOwnProperty(operator)) {
-                            funcNameIdentifier = func_operator[operator];
+                        if (globalFuncNameIdentifier.hasOwnProperty(operator)) {
+                            funcNameIdentifier = globalFuncNameIdentifier[operator];
                         } else {
-                            let BlockStatement = path_.findParent(
-                                function (p) {
-                                    return p.isBlockStatement();
-                                }
-                            );
-                            // 这里判断写简单了,判断出while循环才行
-                            while (type.isWhileStatement(BlockStatement.parentPath)) {
-                                BlockStatement = BlockStatement.parentPath.findParent(
-                                    function (p) {
-                                        return p.isBlockStatement();
-                                    }
-                                );
-                            }
+                            let BlockStatement = path_.getFunctionParent().get("body");
                             funcNameIdentifier = BlockStatement.scope.generateUidIdentifier("_0x");
-                            func_operator[operator] = funcNameIdentifier;
+                            globalFuncNameIdentifier[operator] = funcNameIdentifier;
                             func = type.functionDeclaration(
                                 funcNameIdentifier,
                                 [a, b],
@@ -125,45 +113,106 @@ const junkCodeModule = {
                             // 这里把生成的方法,往函数作用域内最上方丢.
                             // (方法可以生成的更恶心些) 嵌套2层,对数字进行计算操作,更具迷惑性
                             BlockStatement.node.body.unshift(func);
+
                         }
+
                         path_.replaceWith(type.callExpression(funcNameIdentifier, [left, right]));
+                    }
+                },
+                AssignmentExpression(path_) {
+                    if (path_.getFunctionParent() === path) {
+                        // 二项式计算
+                        let operator = path_.node.operator;
+                        if (operator != "=") {
+                            let left = path_.node.left;
+                            let right = path_.node.right;
+                            let a = type.identifier("a");
+                            let b = type.identifier("b");
+                            let func;
+                            let funcNameIdentifier;
+                            if (func_operator.hasOwnProperty(operator)) {
+                                funcNameIdentifier = func_operator[operator];
+                            } else {
+                                let BlockStatement = path_.getFunctionParent().get("body");
+                                funcNameIdentifier = BlockStatement.scope.generateUidIdentifier("_0x");
+                                func_operator[operator] = funcNameIdentifier;
+                                func = type.functionDeclaration(
+                                    funcNameIdentifier,
+                                    [a, b],
+                                    type.blockStatement([type.returnStatement(
+                                        type.assignmentExpression(operator, a, b)
+                                    )])
+                                );
+                                // 这里把生成的方法,往函数作用域内最上方丢.
+                                // (方法可以生成的更恶心些) 嵌套2层,对数字进行计算操作,更具迷惑性
+                                BlockStatement.node.body.unshift(func);
+                            }
+                            path_.replaceWith(type.callExpression(funcNameIdentifier, [left, right]));
+                        }
+                    }
+                },
+                UnaryExpression(path_) {
+                    if (path_.getFunctionParent() === path) {
+                        // 二项式计算
+                        let operator = path_.node.operator;
+                        if (operator != "delete") {
+                            let left = path_.node.argument;
+                            // let right = path_.node.right;
+                            let a = type.identifier("a");
+                            let b = type.identifier("b");
+                            let func;
+                            let funcNameIdentifier;
+                            if (globalFuncNameIdentifier.hasOwnProperty(operator)) {
+                                funcNameIdentifier = globalFuncNameIdentifier[operator];
+                            } else {
+                                let BlockStatement = path_.getFunctionParent().get("body");
+                                funcNameIdentifier = BlockStatement.scope.generateUidIdentifier("_0x");
+                                globalFuncNameIdentifier[operator] = funcNameIdentifier;
+                                func = type.functionDeclaration(
+                                    funcNameIdentifier,
+                                    [a, b],
+                                    type.blockStatement([type.returnStatement(
+                                        type.unaryExpression(operator, a)
+                                    )])
+                                );
+                                // 这里把生成的方法,往函数作用域内最上方丢.
+                                // (方法可以生成的更恶心些) 嵌套2层,对数字进行计算操作,更具迷惑性
+                                BlockStatement.node.body.unshift(func);
+                            }
+                            var call_node = type.callExpression(funcNameIdentifier, [left]);
+                            path_.replaceWith(call_node);
+                        }
                     }
                 },
                 MemberExpression(path_) {
                     // 方法调用转花指令函数
-                    if (type.isStringLiteral(path_.node.property) && type.isIdentifier(path_.node.object)) {
+
+                    if (path_.getFunctionParent() === path && path_.parentPath.type !== "CallExpression" && !(path_.parentPath.type == "AssignmentExpression"
+                        && path_.parentPath.get("left") === path_) && path_.parentPath.type !== "UpdateExpression"
+                        && type.isStringLiteral(path_.node.property) &&
+                        type.isIdentifier(path_.node.object)) {
                         let obj_name = path_.node.object.name;
                         let func_name = path_.node.property.value;
-                        let c = type.identifier("c");
-                        let d = type.identifier("d");
+                        let a = type.identifier("a");
+                        let b = type.identifier("b");
                         let funcNameIdentifier
-                        if (!globalFuncNameIdentifier) {
-                            let BlockStatement = path_.findParent(
-                                function (p) {
-                                    return p.isBlockStatement();
-                                }
-                            );
-                            while (type.isWhileStatement(BlockStatement.parentPath)) {
-                                BlockStatement = BlockStatement.parentPath.findParent(
-                                    function (p) {
-                                        return p.isBlockStatement();
-                                    }
-                                );
-                            }
+                        if (!globalFuncNameIdentifier.hasOwnProperty("memberExpression")) {
+                            let BlockStatement = path_.getFunctionParent().get("body");
                             funcNameIdentifier = BlockStatement.scope.generateUidIdentifier("_0x");
-                            globalFuncNameIdentifier = funcNameIdentifier;
+                            globalFuncNameIdentifier["memberExpression"] = funcNameIdentifier;
                             let func = type.functionDeclaration(
                                 funcNameIdentifier,
-                                [c, d],
+                                [a, b],
                                 type.blockStatement([type.returnStatement(
-                                    type.memberExpression(c, d, true)
+                                    type.memberExpression(a, b, true)
                                 )])
                             );
+                            func.zcj = true;
                             // 这里把生成的方法,往函数作用域内最上方丢.
                             // (方法可以生成的更恶心些) 嵌套2层
                             BlockStatement.node.body.unshift(func);
-                        }
-                        else funcNameIdentifier = globalFuncNameIdentifier;
+
+                        } else funcNameIdentifier = globalFuncNameIdentifier["memberExpression"];
                         path_.replaceWith(type.callExpression(funcNameIdentifier, [type.identifier(obj_name), type.stringLiteral(func_name)]));
                     }
                 }

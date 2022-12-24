@@ -7,13 +7,15 @@ traverse = require("@babel/traverse").default;
 generator = require("@babel/generator").default;
 type = require("@babel/types");
 fs = require("fs");
-var code = "";
+var code;
+/* 保存整个js里属于window的对象 console,Object,document */
 var obj = [];
 var OPCODE = {
     PASS: 11, // 这是个无用字节码,不作任何操作
     PUSH_NUM: 12,
     PUSH_STR: 13,
     PUSH_NULL: 14,
+    PUSH_UNDEFINED: 15,
 
     PUSH_WINDOW: 65, // 主要是this可能是构造器,导致这个this不是window了.
     PUSH_VAR: 66, // 将变量池里的变量压入栈
@@ -52,7 +54,61 @@ var OPCODE = {
     BREAK: 92, // break, 正常的思路应该是break出一段代码的.
     CONTINUE: 93, // continue
 
+    '*': 1000,
+    '/': 1001,
+    '%': 1002,
+    '+': 1003,
+    '-': 1004,
+    '<<': 1005,
+    '>>': 1006,
+    '>>>': 1007,
+    '>': 1008,
+    '<': 1009,
+    '>=': 1010,
+    '<=': 1011,
+    '==': 1012,
+    '===': 1013,
+    '!==': 1014,
+    '!=': 1015,
+    '&': 1016,
+    '^': 1017,
+    '|': 1018,
+    '=': 1019,
+    '*=': 1020,
+    '/=': 1021,
+    '%=': 1022,
+    '&=': 1023,
+    '+=': 1024,
+    '-=': 1025,
+    '<<=': 1026,
+    '>>=': 1027,
+    '^=': 1028,
+    '|=': 1029,
+    'in': 1030,
+    'instanceof': 1031,
 }
+var OPCODE1 = {
+    '!': 1032,
+    '+': 1033,
+    '-': 1034,
+    '~': 1035,
+    'typeof': 1036,
+    'void': 1037,
+}
+
+var NEW_OPCODE = {};
+var NEW_OPCODE1 = {};
+var ALL_OPCODE = [];
+
+/* 一个指令对应几种字节码, 也意味着vmp代码cases会翻几倍 */
+var times = 10;
+/* 用字符串symbol来进行函数调用计算结果. 使用频率为 1/4 */
+var use_symbol_rate = 4;
+
+/* 是否让字符串字节码 + 66 */
+var string_code = true;
+string_code = false;
+
 /* 回填模式 */
 var mode = {
     backfill_identifier: "PUSH_MOV_identifier",
@@ -131,10 +187,12 @@ function backfill_continue(opcode) {
 /* 字符串转数字数组 */
 function strToNumArr(str) {
     return str.split("").map((str) => {
-        return str.charCodeAt();
+        if (string_code) return str.charCodeAt() + 66;
+        else return str.charCodeAt();
     });
 }
 
+/* 字符串转字节码数组 */
 function strToOpcode(str) {
     var opcode = [];
     opcode.push(OPCODE.PUSH_STR);
@@ -183,7 +241,7 @@ function generate(node) {
             /* 赋值主要是要从变量池里拿到对象直接进行操作,不同于把值或者对象push到堆栈里 */
             if (!node.node.init) {
                 /*没有init push null*/
-                opcode.push(OPCODE.PUSH_NULL);
+                opcode.push(OPCODE.PUSH_UNDEFINED);
             } else {
                 opcode = opcode.concat(generate(node.get("init")));
             }
@@ -201,7 +259,7 @@ function generate(node) {
         case "ObjectExpression":
             /* 主要逻辑写在 ObjectProperty 即可 */
             var len = node.node.properties.length;
-            for (var i = 0; i < len; i++) {
+            for (var i = len - 1; i > -1; i--) {
                 opcode = opcode.concat(generate(node.get("properties")[i]));
             }
             opcode.push(OPCODE.NEW_OBJECT);
@@ -250,13 +308,15 @@ function generate(node) {
             }
             break
         case "UnaryExpression":
-            if (node.node.operator === "delete") {
+            var operator = node.node.operator;
+            if (operator === "delete") {
                 opcode = opcode.concat(backfill_opcode(generate(node.get("argument")), mode.backfill_member_expression, OPCODE.PASS));
                 opcode.push(OPCODE.DELETE)
             } else {
-                opcode = opcode.concat(strToOpcode(node.node.operator));
+                // opcode = opcode.concat(strToOpcode(node.node.operator));
                 opcode = opcode.concat(generate(node.get("argument")));
-                opcode.push(OPCODE.SINGLE_COMPUTE);
+                // opcode.push(OPCODE.SINGLE_COMPUTE);
+                opcode.push(OPCODE1[operator]);
             }
 
             break
@@ -314,6 +374,7 @@ function generate(node) {
                 opcode = opcode.concat(strToOpcode(name));
                 /* push this 或者 vm_constant 交由上层回填 */
                 opcode.push(mode.backfill_CONSTANT);
+                // opcode.push(OPCODE.PUSH_WINDOW);
                 opcode.push(mode.backfill_identifier);
                 break
             } else if (node.parentPath.type === "MemberExpression" && node.parentPath.get("property") === node) {
@@ -383,15 +444,23 @@ function generate(node) {
             break
         case "AssignmentExpression":
             /*  主要照顾下左边的赋值对象 */
-            var str_opcode = strToOpcode(node.node.operator);
+            // var str_opcode = strToOpcode(node.node.operator);
+            var operator = node.node.operator;
             var right_opcode = generate(node.get("right"));
             var left_opcode = generate(node.get("left"));
             if (node.node.operator !== "=") {
                 // console.log("AssignmentExpression 符号 => ", node.node.operator);
-                opcode = opcode.concat(str_opcode);
-                opcode = opcode.concat(left_opcode);
-                opcode = opcode.concat(right_opcode);
-                opcode.push(OPCODE.COMPUTE);
+                if (chance(use_symbol_rate)) {
+                    opcode = opcode.concat(strToOpcode(operator));
+                    opcode = opcode.concat(left_opcode);
+                    opcode = opcode.concat(right_opcode);
+                    opcode.push(OPCODE.COMPUTE);
+                } else {
+                    opcode = opcode.concat(left_opcode);
+                    opcode = opcode.concat(right_opcode);
+                    opcode.push(OPCODE[operator]);
+                }
+
             } else {
                 opcode = opcode.concat(right_opcode);
             }
@@ -418,12 +487,20 @@ function generate(node) {
             }
             break
         case "BinaryExpression":
-            opcode = opcode.concat(strToOpcode(node.node.operator));
+            var operator = node.node.operator;
+            // opcode = opcode.concat(strToOpcode(node.node.operator));
             var left_opcode = generate(node.get("left"));
             var right_opcode = generate(node.get("right"));
-            opcode = opcode.concat(left_opcode);
-            opcode = opcode.concat(right_opcode);
-            opcode.push(OPCODE.COMPUTE);
+            if (chance(use_symbol_rate)) {
+                opcode = opcode.concat(strToOpcode(operator));
+                opcode = opcode.concat(left_opcode);
+                opcode = opcode.concat(right_opcode);
+                opcode.push(OPCODE.COMPUTE);
+            } else {
+                opcode = opcode.concat(left_opcode);
+                opcode = opcode.concat(right_opcode);
+                opcode.push(OPCODE[operator])
+            }
             break
         case "UpdateExpression":
             var str_opcode = strToOpcode(node.node.operator);
@@ -978,14 +1055,24 @@ const arr_func_to_func = {
     }
 }
 /* var b,se = {};(b = se.aa = {'a':1,'c':'aaa','dd':{'ccc':'123'}}).dd.m = b.dd.ccc; =>
-*                  (b = se.aa = {'a':1,'c':'aaa','dd':{'ccc':'123'}}),b.dd.m = b.dd.ccc;               */
+*                  (b = se.aa = {'a':1,'c':'aaa','dd':{'ccc':'123'}}),b.dd.m = b.dd.ccc;
+* 可能会有问题,遇到语法还得添加判断 */
 const sequencing = {
-    AssignmentExpression(path) {
-        if (path.get("left").isMemberExpression() && path.get("left").get("object").isMemberExpression()
-            && path.get("left").get("object").get("object").isAssignmentExpression()) {
-            var assign = path.node.left.object.object;
-            path.get("left").get("object").get("object").replaceWith(path.node.left.object.object.left);
-            path.insertBefore(assign);
+    // AssignmentExpression(path) {
+    //     if (path.get("left").isMemberExpression() && path.get("left").get("object").isMemberExpression()
+    //         && path.get("left").get("object").get("object").isAssignmentExpression()) {
+    //         var assign = path.node.left.object.object;
+    //         path.get("left").get("object").get("object").replaceWith(path.node.left.object.object.left);
+    //         path.insertBefore(assign);
+    //     }
+    // }
+    MemberExpression(path) {
+        if (path.get("object").isAssignmentExpression()) {
+            var assign_node = path.node.object, parent_path;
+            parent_path = path.findParent(p => p.isAssignmentExpression());
+            path.get("object").replaceWith(path.node.object.left);
+            parent_path.replaceWith(type.sequenceExpression([assign_node, parent_path.node]));
+            // debugger;
         }
     }
 }
@@ -1009,6 +1096,20 @@ const tempToStr = {
         path.skip();
     }
 }
+/* 改变window下属性的访问方式 */
+const changeBuiltinObjects = {
+    Identifier(path) {
+        let name = path.node.name;
+        if (!!window.hasOwnProperty(name) && name !== "window") {
+            if (!!path.scope.getBinding(name) || (path.parentPath.type === "MemberExpression" && path.parentPath.get("property") === path)) {
+                return;
+            }
+            path.replaceWith(type.memberExpression(type.identifier("window"), type.stringLiteral(name), true));
+            path.skip();
+        }
+    }
+}
+
 /* 工具类放在后面 */
 
 /* 取区间随机数 */
@@ -1016,6 +1117,117 @@ function rnd(n, m) {
     var random = Math.floor(Math.random() * (m - n + 1) + n);
     return random;
 }
+
+/* 计算概率 */
+function chance(m) {
+    /* m为2 则是1/2 概率 */
+    return rnd(0, m - 1) === 0
+}
+
+/* 打乱数组 */
+function shuffle(arr) {
+    let _arr = arr.slice(); //slice不会影响原来的数组，但是splice就会影响原来的arr数组
+    for (let i = 0; i < _arr.length; i++) {
+        let j = rnd(0, i);
+        let t = _arr[i];
+        _arr[i] = _arr[j];
+        _arr[j] = t;
+    }
+    return _arr;
+}
+
+/* 生成随机字节码,并选择要几个字节码对应一个指令 */
+function expand_opcode(i) {
+    var z;
+    for (z in OPCODE) {
+        /* 指令对应的字节码 */
+        var t = [];
+        var code;
+        if (z === "BREAK" || z === "CONTINUE") {
+            while (true) {
+                code = rnd(1, 300 * i);
+                if (ALL_OPCODE.indexOf(code) == -1) {
+                    ALL_OPCODE.push(code);
+                    t.push(code);
+                    break
+                }
+            }
+        } else {
+            for (var m = 0; m < i; m++) {
+                while (true) {
+                    code = rnd(1, 300 * i);
+                    if (ALL_OPCODE.indexOf(code) == -1) {
+                        ALL_OPCODE.push(code);
+                        t.push(code);
+                        break
+                    }
+                }
+            }
+        }
+        NEW_OPCODE[z] = t;
+        NEW_OPCODE[z].index = 0;
+    }
+    OPCODE = new Proxy(OPCODE, {
+        get(target, p, receiver) {
+            if (NEW_OPCODE[p].index >= NEW_OPCODE[p].length) {
+                NEW_OPCODE[p].index = 0;
+            }
+            return NEW_OPCODE[p][NEW_OPCODE[p].index++];
+        }
+    });
+    for (z in OPCODE1) {
+        /* 指令对应的字节码 */
+        var t = [];
+        var code;
+        for (var m = 0; m < i; m++) {
+            while (true) {
+                code = rnd(1, 300 * i);
+                if (ALL_OPCODE.indexOf(code) == -1) {
+                    ALL_OPCODE.push(code);
+                    t.push(code);
+                    break
+                }
+            }
+        }
+        NEW_OPCODE1[z] = t;
+        NEW_OPCODE1[z].index = 0;
+    }
+    OPCODE1 = new Proxy(OPCODE1, {
+        get(target, p, receiver) {
+            if (NEW_OPCODE1[p].index >= NEW_OPCODE1[p].length) {
+                NEW_OPCODE1[p].index = 0;
+            }
+            return NEW_OPCODE1[p][NEW_OPCODE1[p].index++];
+        }
+    });
+}
+
+/* 改写js */
+function transform_js(ast) {
+
+    traverse(ast, arr_func_to_func);
+    traverse(ast, change_obj_key);
+    traverse(ast, tempToStr);
+    for (var i = 0; i < 2; i++) {
+        traverse(ast, num_to_express);
+    }
+    traverse(ast, remove_empty);
+    traverse(ast, change_pattern);
+    traverse(ast, add_block);
+    traverse(ast, sequencing);
+    traverse(ast, forIn_to_for);
+    traverse(ast, get_object);
+    traverse(ast, function_unshift);
+    traverse(ast, changeBuiltinObjects);
+
+    // var ast_ = parse(generator(ast).code);
+    return ast;
+}
+
+/* 至少大于1 */
+expand_opcode(times);
+
+// console.log(NEW_OPCODE);
 
 // code = "var b = {\"a\":\"c\",1:1,b:\"3\"};var a = 10; a += b[1];"
 // code = "var a = function(){ console.log(1);}; a();"
@@ -1052,17 +1264,7 @@ function rnd(n, m) {
 //     "}\n" +
 //     "\n" +
 //     "console.log(e(\"dadasd\"))"
-// code = "var ji = {\"y\":90, \"ds\":78}\n" +
-//     "for (var i in ji){\n" +
-//     "console.log(i);\n" +
-//     "}"
-// code = "var ji = {\"y\":90, \"ds\":78}\n" +
-//     "var i;\n" +
-//     "for (i in ji){\n" +
-//     " console.log(i);\n" +
-//     "}\n"
 // code = "var ji = {\"y\":90, \"ds\":78}\nvar m = 'y';console.log(ji[m])"
-// code = fs.readFileSync("./md5.js") + ''
 // code = "var a = 0;\n" +
 //     "var b = 1;\n" +
 //     "switch (a){\n" +
@@ -1078,18 +1280,14 @@ function rnd(n, m) {
 // code = "var a = 10;var b = {'c':100}; a += b.c;console.log(a);"
 // code = "var a = 1; a ? console.log(1) : console.log(2);console.log('end');"
 // code = "typeof module === \"object\" && typeof module.exports === \"object\""
-// code = "for(var i = 0;;){\n" +
-//     "   console.log(i);\n" +
-//     "   i++;\n" +
-//     "if (i == 7){continue;}\n" +
-//     "else if(i == 9){try{console.log('zcj');break;}catch(e){}}\n" +
-//     "}console.log('zcj')"
-// code = "for(var i = 0; ;){\n" +
-//     "   console.log(i);\n" +
-//     "   i++;\n" +
-//     "if (i == 7)    {try{console.log('zcj1');continue;}catch(e){console.log(e);}}\n" +
-//     "else if(i == 9){try{console.log('zcj');break;}catch(e){console.log(e);break}}\n" +
-//     "}console.log('zcj')"
+// code = "var ji = {\"y\":90, \"ds\":78}\n" +
+//     "for (var i in ji){\n" +
+//     "console.log(zcj);console.log(i);\n" +
+//     "}"
+// code = "var i = 0,length = 20;for(;i < length;i++){ console.log(i);if (i < 10) { continue; } else { break;}  }";
+// code = "var i = 0,length = 20;for(;i < length;){ i++;console.log(i);if (i < 10) { continue; } else if ( i > 50 ) { break } }console.log('end')";
+// code = "var i = 0,length = 20;for(;;){ i++;console.log(i);if (i < 10) { continue; } else if ( i > 50 ) { break }  } console.log('end')";
+// code = "var i = 0,length = 20;for(;;i++){ console.log(i);if (i < 10) { continue; } else if ( i > 50 ) { break }  } console.log('end')";
 // code = "typeof module === \"object\" && typeof module.exports === \"object\" && console.log(1) || console.log('a')"
 // code = "function a(){try{var a; return (a = 100);}catch(e){}}console.log(a());"
 // code = "var d;function a(){function b(a){console.log(a);d = a;} return b;} a()(1);console.log(d);"
@@ -1107,10 +1305,6 @@ function rnd(n, m) {
 //     "  'c': '123'\n" +
 //     "}\n" +
 //     "console.log(a);"
-// code = "var i = 0,length = 20;for(;i < length;i++){ console.log(i);if (i < 10) { continue; } else { break;}  }"
-// code = "var i = 0,length = 20;for(;i < length;){ i++;console.log(i);if (i < 10) { continue; } else if ( i > 50 ) { break } }console.log('end')"
-// code = "var i = 0,length = 20;for(;;){ i++;console.log(i);if (i < 10) { continue; } else if ( i > 50 ) { break }  } console.log('end')"
-// code = "var i = 0,length = 20;for(;;i++){ console.log(i);if (i < 10) { continue; } else if ( i > 50 ) { break }  } console.log('end')"
 // code = "console.log(typeof module === \"object\" && typeof module.exports === \"object\");"
 // code = "for (var zcj = Object.keys({\n" +
 //     "      \"submit\": true,\n" +
@@ -1141,14 +1335,24 @@ function rnd(n, m) {
 //     "(e.a = function () {\n" +
 //     "console.log(this);\n" +
 //     "})();"
+// code = "var b,se = {};if(true){(b = se.aa = {'a':1,'c':'aaa','dd':{'ccc':'123'}}).dd.m = b.dd.ccc;console.log(b);}"
+// code = "console.log(String.fromCharCode.apply(undefined,[99,99,99]));"
+// code = "for(var i = 0; ;){\n" +
+//     "   console.log(i);\n" +
+//     "   i++;\n" +
+//     "if (i == 7)    {try{console.log('zcj1');continue;}catch(e){console.log(e);}}\n" +
+//     "else if(i == 9){try{console.log('zcj');break;}catch(e){console.log(e);break}}\n" +
+//     "}console.log('end')"
 
-code = "var b,se = {};if(true){(b = se.aa = {'a':1,'c':'aaa','dd':{'ccc':'123'}}).dd.m = b.dd.ccc;console.log(b);}"
-code = "console.log(String.fromCharCode.apply(undefined,[99,99,99]));"
+code = "var b,se = {};(function(){console})(),(b = se.aa = {'a':1,'c':'aaa','dd':{'ccc':'123'}}).dd.a.m = b.dd.c.ccc;"
 // code = fs.readFileSync("./jquery.js") + ''
-// code = fs.readFileSync("./md5.js") + ''
-// code = fs.readFileSync("./test_out.js") + ''
-code = fs.readFileSync("./test1.js") + ''
+code = fs.readFileSync("./md5.js") + ''
+// code = fs.readFileSync("./CryptoJs.js") + ''
+// code = fs.readFileSync("./test1.js") + ''
 // code = fs.readFileSync("./test.js") + ''
+// code = fs.readFileSync("./test_out.js") + ''
+
+// code = "function a(){console.log(1);}var c = a();"
 var ast = parse(code);
 
 var opcode = [];
@@ -1163,34 +1367,733 @@ const test = {
 }
 
 // var a = +new Date();
-traverse(ast, arr_func_to_func);
-traverse(ast, change_obj_key);
-traverse(ast, tempToStr);
-for (var i = 0; i < 2; i++) {
-    traverse(ast, num_to_express);
-}
-traverse(ast, remove_empty);
-traverse(ast, change_pattern);
-traverse(ast, add_block);
-traverse(ast, sequencing);
-traverse(ast, forIn_to_for);
-traverse(ast, get_object);
-traverse(ast, function_unshift);
-
-ast = parse(generator(ast).code);
+ast = transform_js(ast);
 traverse(ast, test);
 opcode = backfill_opcode(opcode, mode.backfill_CONSTANT, OPCODE.PUSH_CONSTANT);
 fs.writeFileSync("./opcode.txt", JSON.stringify(opcode));
-
-// console.log(opcode);
+fs.writeFileSync("./test_out.js", generator(ast).code);
 // console.log(+new Date() - a);
-// console.log(generator(ast).code);
 // var opcode_str = opcode.map((item) =>{ return String.fromCharCode(item+32)}).join('');
 // fs.writeFileSync("./opcode.txt", opcode_str);
+// console.log(obj);
 
-// fs.writeFileSync("./test_out.js", generator(ast).code);
-console.log(obj);
+// for (var i in NEW_OPCODE) {
+//     NEW_OPCODE[i].index = 0;
+// }
+// for (var i in NEW_OPCODE1) {
+//     NEW_OPCODE1[i].index = 0;
+// }
 
-for (var i in identifier_binding_track) {
-    console.log(identifier_binding_track[i].reNameId, " => ", identifier_binding_track[i].oldName);
+// for (var i in identifier_binding_track) {
+//     console.log(identifier_binding_track[i].reNameId, " => ", identifier_binding_track[i].oldName);
+// }
+
+/* 生成一份新的vmp代码 */
+var junk_func_name = [];
+var junk_code_rate = 2;
+/* vm方法复制几倍 */
+var vm_copy_count = times;
+/* 花指令 */
+const junkCodeModule = {
+    'FunctionDeclaration'(path) {
+        if (!(path.node.id.name === "vm_enter")) return;
+        // 保存path scope里的 二项式花指令函数
+        let func_operator = {};
+        var all_func_node = [];
+        var all_func_id_node = [];
+        // 保存path scope里的 方法调用花指令函数
+        let globalFuncNameIdentifier = {};
+        path.traverse({
+                BinaryExpression(path_) {
+                    if (path_.getFunctionParent() === path) {
+                        // 二项式计算
+                        var bin_symbols = [
+                            '*', '/', '%', '+', '-', '<<', '>>', '>>>', '>', '<', '>=', '<=', '==', '===', '!==', '!=', '&', '^', '|',
+                        ];
+                        let operator = path_.node.operator;
+                        let left = path_.node.left;
+                        let right = path_.node.right;
+                        let a = type.identifier("a");
+                        let b = type.identifier("b");
+                        let func;
+                        let func_2;
+                        let funcNameIdentifier;
+                        let funcNameIdentifier1;
+                        if (globalFuncNameIdentifier.hasOwnProperty(operator) && chance(junk_code_rate)) {
+                            funcNameIdentifier = globalFuncNameIdentifier[operator][rnd(0, globalFuncNameIdentifier[operator].length - 1)];
+                        } else {
+                            let BlockStatement = path_.getFunctionParent().get("body");
+                            funcNameIdentifier = BlockStatement.scope.generateUidIdentifier("_" + Math.random().toString(36).substr(9));
+                            funcNameIdentifier1 = BlockStatement.scope.generateUidIdentifier("_" + Math.random().toString(36).substr(9));
+                            if (!globalFuncNameIdentifier[operator]) {
+                                globalFuncNameIdentifier[operator] = [];
+                            }
+                            var random_number = rnd(0, 2000);
+                            var random_number1 = rnd(0, 2000);
+                            var random_symbol = bin_symbols[rnd(0, bin_symbols.length - 1)];
+                            while (random_symbol === operator) {
+                                random_symbol = bin_symbols[rnd(0, bin_symbols.length - 1)];
+                            }
+                            var o_ast = parse("typeof a === 'number' && typeof b === 'number' ? b = (a = a - 1671 , b + 587): this".replace("1671", random_number + '').replace("587", random_number1 + ''));
+                            var conditionalExp1;
+                            traverse(o_ast, {
+                                ConditionalExpression(p_) {
+                                    conditionalExp1 = p_.node;
+                                    p_.stop();
+                                }
+                            });
+                            globalFuncNameIdentifier[operator].push(funcNameIdentifier);
+
+                            func_2 = type.functionDeclaration(
+                                funcNameIdentifier1,
+                                [a, b], type.blockStatement([
+                                    type.returnStatement(
+                                        type.sequenceExpression([conditionalExp1,
+                                                type.conditionalExpression(
+                                                    type.binaryExpression("==", type.thisExpression(), type.identifier("constant")),
+                                                    type.binaryExpression(operator, a, b),
+                                                    type.binaryExpression(random_symbol, a, b)
+                                                )
+                                            ]
+                                        )
+                                    )
+                                ]));
+                            o_ast = parse("b = typeof a === 'number' && typeof b === 'number' ?  (a = a - 1671 , b + 587): b".replace("- 1671", "+ " + random_number + '').replace("+ 587", "- " + random_number1 + ''));
+                            traverse(o_ast, {
+                                AssignmentExpression(p_) {
+                                    conditionalExp1 = p_.node;
+                                    p_.stop();
+                                }
+                            });
+                            func = type.functionDeclaration(
+                                funcNameIdentifier,
+                                [a, b], type.blockStatement([
+                                    type.returnStatement(
+                                        type.sequenceExpression([conditionalExp1, type.callExpression(funcNameIdentifier1, [a, b])])
+                                    )]));
+                            // func = type.functionDeclaration(
+                            //     funcNameIdentifier,
+                            //     [a, b],
+                            //     type.blockStatement([type.returnStatement(
+                            //         type.binaryExpression(operator,
+                            //             a,
+                            //             b)
+                            //     )])
+                            // );
+
+                            // 这里把生成的方法,往函数作用域内最上方丢.
+                            // (方法可以生成的更恶心些) 嵌套2层,对数字进行计算操作,更具迷惑性
+                            all_func_node.push(func);
+                            all_func_node.push(func_2);
+
+                        }
+                        var call_node = type.callExpression(funcNameIdentifier, [left, right]);
+                        if (chance(junk_code_rate)) {
+                            path_.replaceWith(call_node);
+                        }
+
+                    }
+                },
+                MemberExpression(path_) {
+                    // 方法调用转花指令函数
+                    if (path_.getFunctionParent() === path && path_.parentPath.type !== "CallExpression" && !(path_.parentPath.type == "AssignmentExpression"
+                        && path_.parentPath.get("left") === path_) && path_.parentPath.type !== "UpdateExpression"
+                        && type.isStringLiteral(path_.node.property) &&
+                        type.isIdentifier(path_.node.object)) {
+                        let obj_name = path_.node.object.name;
+                        let func_name = path_.node.property.value;
+                        let a = type.identifier("a");
+                        let b = type.identifier("b");
+                        let funcNameIdentifier
+                        if (!globalFuncNameIdentifier.hasOwnProperty("memberExpression")) {
+                            let BlockStatement = path_.getFunctionParent().get("body");
+                            funcNameIdentifier = BlockStatement.scope.generateUidIdentifier("_" + Math.random().toString(36).substr(9));
+                            // globalFuncNameIdentifier["memberExpression"] = funcNameIdentifier;
+                            let func = type.functionDeclaration(
+                                funcNameIdentifier,
+                                [a, b],
+                                type.blockStatement([type.returnStatement(
+                                    type.memberExpression(a, b, true)
+                                )])
+                            );
+                            func.zcj = true;
+                            // 这里把生成的方法,往函数作用域内最上方丢.
+                            // (方法可以生成的更恶心些) 嵌套2层
+                            //BlockStatement.node.body.unshift(func);
+                            all_func_node.push(func);
+
+                        } else funcNameIdentifier = globalFuncNameIdentifier["memberExpression"];
+                        var call_node = type.callExpression(funcNameIdentifier, [type.identifier(obj_name), type.stringLiteral(func_name)]);
+                        if (chance(junk_code_rate)) {
+                            path_.replaceWith(call_node);
+                        }
+
+                    }
+                },
+                FunctionDeclaration(path_) {
+                    if (path_.node.params.length === 0) {
+                        path_.node.params.push(type.identifier("s"));
+                        path_.node.params.push(type.identifier("e"));
+                    }
+                },
+                AssignmentExpression(path_) {
+                    if (path_.getFunctionParent() === path && path_.parentPath.type === path_.type) {
+                        // 二项式计算
+                        let operator = path_.node.operator;
+                        if (operator != "=") {
+                            let left = path_.node.left;
+                            let right = path_.node.right;
+                            let a = type.identifier("a");
+                            let b = type.identifier("b");
+                            let func;
+                            let funcNameIdentifier;
+                            if (globalFuncNameIdentifier.hasOwnProperty(operator) && chance(junk_code_rate)) {
+                                funcNameIdentifier = globalFuncNameIdentifier[operator][rnd(0, globalFuncNameIdentifier[operator].length - 1)];
+                            } else {
+                                let BlockStatement = path_.getFunctionParent().get("body");
+                                funcNameIdentifier = BlockStatement.scope.generateUidIdentifier("_" + Math.random().toString(36).substr(9));
+                                if (!globalFuncNameIdentifier[operator]) {
+                                    globalFuncNameIdentifier[operator] = [];
+                                }
+                                globalFuncNameIdentifier[operator].push(funcNameIdentifier);
+                                func = type.functionDeclaration(
+                                    funcNameIdentifier,
+                                    [a, b],
+                                    type.blockStatement([type.returnStatement(
+                                        type.assignmentExpression(operator, a, b)
+                                    )])
+                                );
+                                // 这里把生成的方法,往函数作用域内最上方丢.
+                                // (方法可以生成的更恶心些) 嵌套2层,对数字进行计算操作,更具迷惑性
+                                //BlockStatement.node.body.unshift(func);
+                                all_func_node.push(func);
+                            }
+
+                            var call_node = type.callExpression(funcNameIdentifier, [left, right]);
+                            if (chance(junk_code_rate)) {
+                                path_.replaceWith(call_node);
+                            }
+                        }
+                    }
+                },
+                UnaryExpression(path_) {
+                    if (path_.getFunctionParent() === path) {
+                        let operator = path_.node.operator;
+                        if (operator != "delete") {
+                            let left = path_.node.argument;
+                            // let right = path_.node.right;
+                            let a = type.identifier("a");
+                            let b = type.identifier("b");
+                            let func;
+                            let funcNameIdentifier;
+
+                            if (globalFuncNameIdentifier.hasOwnProperty("_" + operator) && chance(junk_code_rate)) {
+                                funcNameIdentifier = globalFuncNameIdentifier["_" + operator][rnd(0, globalFuncNameIdentifier["_" + operator].length - 1)];
+                            } else {
+                                let BlockStatement = path_.getFunctionParent().get("body");
+                                funcNameIdentifier = BlockStatement.scope.generateUidIdentifier("_" + Math.random().toString(36).substr(9));
+                                // globalFuncNameIdentifier["_" + operator] = funcNameIdentifier;
+                                if (!globalFuncNameIdentifier["_" + operator]) {
+                                    globalFuncNameIdentifier["_" + operator] = [];
+                                }
+                                globalFuncNameIdentifier["_" + operator].push(funcNameIdentifier);
+                                func = type.functionDeclaration(
+                                    funcNameIdentifier,
+                                    [a, b],
+                                    type.blockStatement([type.returnStatement(
+                                        type.unaryExpression(operator, a)
+                                    )])
+                                );
+                                // 这里把生成的方法,往函数作用域内最上方丢.
+                                // (方法可以生成的更恶心些) 嵌套2层,对数字进行计算操作,更具迷惑性
+                                //BlockStatement.node.body.unshift(func);
+                                all_func_node.push(func);
+                            }
+                            var call_node = type.callExpression(funcNameIdentifier, [left, type.identifier("h")]);
+                            if (chance(junk_code_rate)) {
+                                path_.replaceWith(call_node);
+                            }
+                        }
+                    }
+                },
+            }
+        );
+        all_func_node = shuffle(all_func_node);
+        for (var i in all_func_node) {
+            path.insertBefore(all_func_node[i]);
+            all_func_id_node.push(all_func_node[i].id);
+            junk_func_name.push(all_func_node[i].id.name);
+        }
+        path.insertBefore(
+            type.variableDeclaration("var", [
+                type.variableDeclarator(type.identifier("qa"),
+                    type.arrayExpression(all_func_id_node))
+            ])
+        );
+        var for_ast = parse(
+            "for (var i = 0; i < qa.length; i++) {\n" +
+            "    constant[\"$_\" + i] = qa[i].bind(constant).call.bind(qa[i].bind(constant));\n" +
+            "}");
+        var for_node;
+        traverse(for_ast, {
+            ForStatement(p) {
+                for_node = p.node;
+                p.stop();
+            }
+        });
+        path.insertBefore(for_node);
+        path.skip();
+    }
 }
+/* 复制代码块 */
+const copy_block = {
+    SwitchStatement(path) {
+        /* 找到 字节码 switch 语句,开始复制 */
+        if (path.get("discriminant").type === "Identifier" && path.node.discriminant.name === "g") {
+            var cases = path.node.cases;
+            var new_cases = [], consequent, symbol, m, id, default_case;
+            for (var i = 0; i < cases.length; i++) {
+                consequent = cases[i].consequent;
+                if (!cases[i].test) {
+                    default_case = cases[i];
+                    break
+                }
+                id = cases[i].test.object.name;
+                if (cases[i].test.computed) {
+                    /* 这种是 OPCODE["*"] */
+                    symbol = cases[i].test.property.value;
+                } else symbol = cases[i].test.property.name;
+
+                if (id === "OPCODE") {
+                    for (m = 0; m < NEW_OPCODE[symbol].length; m++) {
+                        // new_cases.push(type.switchCase(type.numericLiteral(NEW_OPCODE[symbol][m]), consequent));
+                        new_cases.push(type.switchCase(cases[i].test, consequent));
+                    }
+                } else {
+                    for (m = 0; m < NEW_OPCODE1[symbol].length; m++) {
+                        // new_cases.push(type.switchCase(type.numericLiteral(NEW_OPCODE1[symbol][m]), consequent));
+                        new_cases.push(type.switchCase(cases[i].test, consequent));
+                    }
+                }
+            }
+            new_cases = shuffle(new_cases);
+            new_cases.push(default_case);
+            path.node.cases = new_cases;
+            path.skip();
+        }
+    }
+}
+/* vm_push 有概率转-> vm_push_2 老是用一个push 太假了 */
+const push_to_push2 = {
+    FunctionDeclaration(path) {
+        if (!(path.node.id.name === "vm_enter")) return;
+        /* 把vm_push -> vm_push2 1/2吧 */
+        var scope_ = path.scope;
+        var binding = scope_.getBinding("vm_push");
+        var reference = binding.referencePaths;
+        for (i = 0; i < reference.length; i++) {
+            if (reference[i].parentPath.type === "CallExpression") {
+                if (chance(2)) {
+                    reference[i].replaceWith(type.identifier("vm_push_2"));
+                }
+            }
+        }
+    }
+}
+/* 复制vm代码 */
+var func_name_track = {};//存放复制后的方法名,后续要将有使用到的地方轮番替换
+
+const copy_vm_function = {
+    FunctionDeclaration(path) {
+        if (!(path.node.id.name === "vm_enter")) return;
+        var old_func_name, func_name;
+        var scope_ = path.scope;
+        var func_node = [];
+        var block_body = path.node.body.body;
+        for (var i = 0; i < block_body.length; i++) {
+            if (type.isFunctionDeclaration(block_body[i])) {
+                old_func_name = block_body[i].id.name
+                func_name_track[old_func_name] = [old_func_name];
+                for (var j = 0; j < vm_copy_count; j++) {
+                    func_name = scope_.generateUidIdentifier("_" + Math.random().toString(36).substr(9));
+                    func_name_track[old_func_name].push(func_name.name);
+                    func_node.push(
+                        type.functionDeclaration(func_name, block_body[i].params, block_body[i].body)
+                    );
+                }
+                // debugger;
+            } else break;
+        }
+        func_node = shuffle(func_node);
+        block_body = func_node.concat(block_body);
+        path.get("body").replaceWith(type.blockStatement(block_body));
+        path.stop();
+    }
+}
+
+const replace_vm_function = {
+    FunctionDeclaration(path) {
+        if (!(path.node.id.name === "vm_enter")) return;
+        var reference, func_name_t, j, m = 0, func_name, scope_ = path.scope;
+        for (var old_func_name in func_name_track) {
+            func_name_t = func_name_track[old_func_name];
+            reference = scope_.getBinding(old_func_name).referencePaths;
+            for (j = 0; j < reference.length; j++) {
+                if (reference[j].parentPath.type !== "FunctionDeclaration") {
+                    reference[j].node.name = func_name_t[m++];
+                    if (m === func_name_t.length) {
+                        m = 0;
+                    }
+                }
+            }
+            func_name = scope_.generateUidIdentifier("_" + Math.random().toString(36).substr(9)).name;
+            scope_.rename(old_func_name, func_name);
+        }
+    }
+}
+/* 堆栈push进行加垃圾代码,要跟运算函数混合 */
+const add_dead_code = {
+    SwitchStatement(path) {
+        /* 找到 字节码 switch 语句,开始复制 */
+        if (!(path.get("discriminant").type === "Identifier" && path.node.discriminant.name === "g")) return;
+        var bin_symbols = [
+            '*', '/', '%', '+', '-', '<<', '>>', '>>>', '>', '<', '>=', '<=', '==', '===', '!==', '!=', '&', '^', '|',
+        ];
+        var ass_symbols = ['*=', '/=', '%=', '&=', '+=', '-=', '<<=', '>>=', '^=', '|=']
+        // var unary_symbols = ['!', '+', '-', '~', 'typeof', 'void'];
+        var unary_symbols = ['!', 'typeof', 'void'];
+        var symbols = bin_symbols.concat(unary_symbols);
+        var id = ["hj", "jk", "lk", "ik"];
+        var id1 = ["m", "cz", "zc",]
+        var func_name = ["vm_push_fake_1", "vm_push_fake_2", "vm_push_fake_3"]
+        path.traverse({
+            SwitchCase(path_) {
+                if (path_.get("test").type === "MemberExpression" && !!path_.node.test && path_.node.test.computed) {
+                    if (path_.node.test.object.name === "OPCODE") {
+                        /* 找到运算的地方 */
+                        id = shuffle(id);
+                        id1 = shuffle(id1);
+                        var d = type.identifier("d");
+                        var h = type.identifier("h");
+                        var new_d = type.identifier(id1[0]);
+                        var new_h = type.identifier(id1[1]);
+                        func_name = shuffle(func_name);
+                        var new_case = [], symbol;
+                        var push_value = [], compute_node = [];
+                        // path_.scope.rename("y", id[0]); // 这样有问题
+
+                        // 2个值
+                        new_case[0] = path_.node.consequent[0];
+                        new_case[1] = path_.node.consequent[1];
+                        // 运算
+                        compute_node[0] = path_.node.consequent[2];
+                        // push 堆栈
+                        push_value[0] = path_.node.consequent[3];
+
+                        for (var i = 1; i < id.length; i++) {
+                            let now_id = type.identifier(id[i]);
+                            symbol = symbols[rnd(0, symbols.length - 1)];
+                            var ary_node;
+                            if (bin_symbols.indexOf(symbol) !== -1) {
+                                ary_node = type.expressionStatement(
+                                    type.assignmentExpression("=", now_id,
+                                        type.binaryExpression(symbol, new_h, new_d))
+                                )
+                            } else if (unary_symbols.indexOf(symbol) !== -1) {
+                                ary_node = type.expressionStatement(
+                                    type.assignmentExpression("=", now_id,
+                                        type.unaryExpression(symbol, new_d))
+                                )
+                            }
+                            compute_node.push(ary_node);
+                            // if (ass_symbos.indexOf(symbol) !== -1) {
+                            //     compute_node.push(type.expressionStatement(
+                            //         type.assignmentExpression("=",now_id ,
+                            //             type.assignmentExpression(symbol, new_h, new_d))
+                            //     ));
+                            // } else {
+                            //     compute_node.push(type.expressionStatement(
+                            //         type.assignmentExpression("=", now_id,
+                            //             type.binaryExpression(symbol, new_h, new_d))
+                            //     ));
+                            // }
+
+                            push_value.push(type.expressionStatement(
+                                type.callExpression(type.identifier(func_name[i - 1]), [
+                                    now_id
+                                ])
+                            ));
+                        }
+                        path_.traverse({
+                            Identifier(p) {
+                                if (p.node.name === "d") {
+                                    p.replaceWith(new_d);
+                                } else if (p.node.name === "h") {
+                                    p.replaceWith(new_h);
+                                }
+                                p.skip();
+                            }
+                        });
+                        compute_node[0].expression.left.name = id[0];
+                        push_value[0].expression.arguments[0].name = id[0];
+                        // new_case.push(compute_node[0]);
+                        compute_node = shuffle(compute_node);
+                        push_value = shuffle(push_value);
+                        new_case = new_case.concat(compute_node);
+                        new_case = new_case.concat(push_value);
+                        new_case.push(
+                            type.breakStatement()
+                        );
+                        path_.node.consequent = new_case;
+                    } else if (path_.node.test.object.name === "OPCODE1") {
+                        id = shuffle(id);
+                        id1 = shuffle(id1);
+                        var d = type.identifier("d");
+                        var h = type.identifier("h");
+                        var new_d = type.identifier(id1[0]);
+                        var new_h = type.identifier(id1[1]);
+                        func_name = shuffle(func_name);
+                        var new_case = [], symbol;
+                        var push_value = [], compute_node = [];
+                        // path_.scope.rename("y", id[0]); // 这样有问题
+                        path_.traverse({
+                            Identifier(p) {
+                                if (p.node.name === "d") {
+                                    p.replaceWith(new_d);
+                                } else if (p.node.name === "h") {
+                                    p.replaceWith(new_h);
+                                }
+                                p.skip();
+                            }
+                        });
+                        // 2个值
+                        new_case[0] = path_.node.consequent[0];
+                        new_case[1] = path_.node.consequent[1];
+                        // 运算
+                        compute_node[0] = path_.node.consequent[2];
+                        // push 堆栈
+                        push_value[0] = path_.node.consequent[3];
+
+                        for (var i = 1; i < id.length; i++) {
+                            let now_id = type.identifier(id[i]);
+                            symbol = unary_symbols[rnd(0, unary_symbols.length - 1)];
+                            var ary_node;
+
+                            ary_node = type.expressionStatement(
+                                type.assignmentExpression("=", now_id,
+                                    type.unaryExpression(symbol, new_d))
+                            )
+
+                            compute_node.push(ary_node);
+                            push_value.push(type.expressionStatement(
+                                type.callExpression(type.identifier(func_name[i - 1]), [
+                                    now_id
+                                ])
+                            ));
+                        }
+                        compute_node[0].expression.left.name = id[0];
+                        push_value[0].expression.arguments[0].name = id[0];
+                        // new_case.push(compute_node[0]);
+                        compute_node = shuffle(compute_node);
+                        push_value = shuffle(push_value);
+                        new_case = new_case.concat(compute_node);
+                        new_case = new_case.concat(push_value);
+                        new_case.push(
+                            type.breakStatement()
+                        );
+                        path_.node.consequent = new_case;
+                    }
+
+                    path_.skip();
+                }
+            }
+        });
+
+    }
+}
+/* 把所有方法保存到一个对象里 */
+const replace_call = {
+    FunctionDeclaration(path) {
+        var scope_ = path.scope;
+        var reference, id;
+        var ran = ["d", "m", "h", "y", "zc", "cz", "hj", "jk", "lk", "ik"];
+        for (var len = 0; len < junk_func_name.length; len++) {
+            reference = scope_.getBinding(junk_func_name[len]).referencePaths;
+            for (var i = 0; i < reference.length; i++) {
+                if (reference[i].parentPath.type === "CallExpression") {
+                    id = ran[rnd(0, ran.length - 1)];
+                    if (!scope_.getBinding(id)) id = "this"
+                    reference[i].parentPath.node.arguments.unshift(
+                        type.identifier(id)
+                    );
+                    reference[i].replaceWith(
+                        type.memberExpression(
+                            type.identifier("constant"),
+                            type.stringLiteral(`$_${len}`), true
+                        )
+                    );
+                }
+            }
+        }
+        path.stop();
+    }
+}
+/* 把所有方法保存到一个对象里 */
+const replace_vm_call = {
+    FunctionDeclaration(path) {
+        if (!(path.node.id.name === "vm_enter")) return;
+        var scope_ = path.scope;
+        var reference;
+        var block_body = path.node.body.body;
+        var vm_func_node = [];
+        var len;
+        var ran = ["d", "m", "h", "y", "zc", "cz", "hj", "jk", "lk", "ik"];
+        for (len = 0; len < block_body.length; len++) {
+            if (type.isFunctionDeclaration(block_body[len])) {
+                reference = scope_.getBinding(block_body[len].id.name).referencePaths;
+                vm_func_node.push(block_body[len].id);
+                for (var i = 0; i < reference.length; i++) {
+                    if (reference[i].parentPath.type === "CallExpression") {
+                        reference[i].parentPath.node.arguments.unshift(
+                            type.identifier(ran[rnd(0, ran.length - 1)])
+                        );
+                        reference[i].replaceWith(
+                            type.memberExpression(
+                                type.identifier("vm_constant"),
+                                type.stringLiteral(`_$${len}`), true
+                            )
+                        );
+                    }
+                }
+            } else break;
+        }
+
+
+        var for_ast = parse(
+            "for (var i = 0; i < qa.length; i++) {\n" +
+            "    constant[\"_$\" + i] = qa[i].bind(constant).call.bind(qa[i].bind(constant));\n" +
+            "}");
+        var for_node;
+        traverse(for_ast, {
+            ForStatement(p) {
+                for_node = p.node;
+                p.stop();
+            }
+        });
+        block_body.unshift(for_node);
+        block_body.unshift(
+            type.variableDeclaration("var", [
+                type.variableDeclarator(type.identifier("qa"),
+                    type.arrayExpression(vm_func_node))
+            ])
+        );
+        path.get("body").replaceWith(type.blockStatement(block_body));
+        path.stop();
+    }
+}
+
+const return_opcode = {
+    MemberExpression(path) {
+        var obj;
+        var node;
+        if (path.get("object").type === "Identifier") {
+            if (path.node.object.name === "OPCODE") {
+                obj = OPCODE;
+            } else if (path.node.object.name === "OPCODE1") {
+                obj = OPCODE1;
+            } else return;
+
+            if (path.node.computed) {
+                node = type.numericLiteral(obj[path.node.property.value]);
+            } else {
+                node = type.numericLiteral(obj[path.node.property.name]);
+            }
+
+            path.replaceWith(node);
+        }
+
+    }
+}
+/* 逗号表达式*/
+const exp_to_comma = {
+    'FunctionDeclaration'(path) {
+        if (!(path.node.id.name === "vm_enter")) return;
+
+    }
+}
+
+var vm_code = fs.readFileSync("./vm_enter.js") + '';
+
+ast = parse(vm_code);
+traverse(ast, copy_block);
+ast = parse(generator(ast).code);
+traverse(ast, push_to_push2);
+ast = parse(generator(ast).code);
+traverse(ast, add_dead_code);
+ast = parse(generator(ast).code);
+traverse(ast, copy_vm_function);
+ast = parse(generator(ast).code);
+traverse(ast, replace_vm_function);
+traverse(ast, return_opcode);
+
+/* 这里把vm方法复制 */
+traverse(ast, junkCodeModule);
+ast = parse(generator(ast).code);
+traverse(ast, replace_call);
+ast = parse(generator(ast).code);
+traverse(ast, replace_vm_call);
+
+traverse(ast, exp_to_comma);
+
+var vmp_code = generator(ast).code;
+fs.writeFileSync("./vmp.js", vmp_code);
+/* 以下都是废弃的 */
+/* 给if for 循环加一层外套 */
+const add_coat = {
+    'ForStatement|IfStatement'(path) {
+        var coat = type.expressionStatement(type.callExpression(
+            type.functionExpression(null, [], type.blockStatement([path.node])), []
+        ));
+        path.replaceWith(coat);
+        path.skip();
+    }
+}
+/* 填充函数调用时没有参数 */
+const fill_call_params = {
+    CallExpression(path_) {
+        if (path_.node.arguments.length === 0) {
+            var ran = ["d", "m", "h", "y", "zc", "cz"];
+            var a = ran[rnd(0, ran.length - 1)];
+            var b = ran[rnd(0, ran.length - 1)];
+            while (a === b) {
+                b = ran[rnd(0, ran.length - 1)];
+            }
+            path_.node.arguments.push(type.identifier(a));
+            path_.node.arguments.push(type.identifier(b));
+        } else if (path_.get("callee").isIdentifier() && path_.node.callee.name === "vm_push" && path_.node.arguments.length == 1) {
+
+            path_.skip();
+        }
+    },
+}
+/* 函数重命名 */
+/* 巨慢,这个rename */
+const rename_function = {
+    FunctionDeclaration(path) {
+        if (!(path.node.id.name === "vm_enter")) return;
+        var block = path.node.body.body;
+        var func_name, new_func_name;
+        var scope_ = path.scope;
+        for (var i = 0; i < block.length; i++) {
+            if (type.isFunctionDeclaration(block[i])) {
+                func_name = block[i].id.name;
+                if (func_name.indexOf("vm") !== -1) {
+                    new_func_name = scope_.generateUidIdentifier("_" + Math.random().toString(36).substr(9)).name;
+                    scope_.rename(func_name, new_func_name);
+                }
+            }
+        }
+    }
+}
+// traverse(ast, rename_function);
+

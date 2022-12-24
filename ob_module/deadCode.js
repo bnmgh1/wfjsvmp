@@ -11,6 +11,7 @@ const deadCodeModule = {
         /*
         第三种情况
          */
+
         let func_name = path.node.id.name;
         let func_param = path.node.params;
         let func_blockSta = path.node.body;
