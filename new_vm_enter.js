@@ -157,7 +157,7 @@ var OPCODE1 = {
             return result;
         }
 
-        function vm_stack_slice(s, e) {
+        function vm_stack_splice(s, e) {
             // return vm_stack.splice(s, e);
             return stack_splice(this, s, e);
         }
@@ -272,21 +272,17 @@ var OPCODE1 = {
         }
 
         function vm_call(s, e, p, z, args, constant) {
-            var i;
+            var i = 0, p_constant = {};
             // if (!z.$4) z.$4 = {};
             // var p_constant = z.$4;
-            var p_constant = {};
-            p_constant.__proto__ = constant, p_constant.$5 = args;
-            for (i = 0; i < p.length; i++) {
-                p_constant[p[i]] = args[i];
-            }
-            // p_constant["arguments"] = args;
+            p_constant.__proto__ = constant, p_constant.$5 = args,
+                p = p.map(it => p_constant[it] = args[i++]), h = vm_enter.apply(this, [opcode.slice(s, e), 0, p_constant, [], 0, []]);
             // 通过args把需要的参数放到当前常量池中去,然后开始调用
-            h = vm_enter.apply(this, [opcode.slice(s, e), 0, p_constant, [], 0, []]);
-            if (Array.isArray(h)) {
-                h = h[1]
-            } else return;
-            return h;
+            // for (i = 0; i < p.length; i++) {
+            //     p_constant[p[i]] = args[i];
+            // }
+            // p_constant["arguments"] = args;
+            return Array.isArray(h) ? (h = h[1], h) : void 0;
         }
 
         var vm_stack, h, y, d, g, m, cz, zc,
@@ -328,9 +324,11 @@ var OPCODE1 = {
                 case OPCODE.PUSH_STR:
                     h = vm_opcodeToString.apply(undefined, [vm_slice()]);
                     vm_push(h);
+
                     // if (is_console) {
                     //     console.log("push 字符串 => ", h);
                     // }
+
                     break
                 case OPCODE.PUSH_NUM:
                     h = vm_get_opcode();
@@ -429,7 +427,7 @@ var OPCODE1 = {
                     // for (var i = 0; i < y; i++) {
                     //     d[y - i - 1] = vm_get_value();
                     // }
-                    d = vm_stack_slice(vm_stack.$0 - y, y);
+                    d = vm_stack_splice(vm_stack.$0 - y, y);
                     vm_stack.$0 = vm_stack.$0 - y;
                     vm_push(d);
                     break
@@ -473,7 +471,7 @@ var OPCODE1 = {
                         m = vm_get_value(), h = vm_get_value(), y[h] = m, it
                     });
                     d = vm_stack.$0;
-                    vm_stack_slice(vm_stack.$0, vm_stack.length - 1);
+                    vm_stack_splice(vm_stack.$0, vm_stack.length - 1);
                     vm_stack.$0 = d;
                     vm_push(y);
                     break

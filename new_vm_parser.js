@@ -102,7 +102,9 @@ var NEW_OPCODE = {};
 var NEW_OPCODE1 = {};
 
 /* 一个指令对应几种字节码, 也意味着vmp代码cases会翻几倍 */
-var times = 20, turn, vmp_turn;
+var times = 20,
+    turn, vmp_turn;
+/* 开关, 膨胀指令对应字节码以及vm代码混淆 */
 turn = vmp_turn = 1;
 /* 用字符串symbol来进行函数调用计算结果. 使用频率为 1/4 */
 var use_symbol_rate = 4;
@@ -377,7 +379,6 @@ function generate(node) {
             opcode.push(OPCODE.MOV_VAR);
             opcode = opcode.concat(block_opcode);
             break
-
 
         /*比较麻烦的节点*/
         case "Identifier":
@@ -1350,10 +1351,9 @@ function transform_js(ast) {
     traverse(ast, change_pattern);
     traverse(ast, add_block);
     // traverse(ast, forIn_to_for);
-    traverse(ast, get_object);
+    // traverse(ast, get_object);
     traverse(ast, function_unshift);
     traverse(ast, changeBuiltinObjects);
-
 
     // var ast_ = parse(generator(ast).code);
     return ast;
@@ -1364,8 +1364,6 @@ if (turn) {
     expand_opcode(times);
 }
 
-
-// console.log(NEW_OPCODE);
 
 // code = "var b = {\"a\":\"c\",1:1,b:\"3\"};var a = 10; a += b[1];"
 // code = "var a = function(){ console.log(1);}; a();"
@@ -1483,7 +1481,6 @@ if (turn) {
 //     "}console.log('end')"
 // code = "var b,se = {};(function(){console})(),(b = se.aa = {'a':1,'c':'aaa','dd':{'ccc':'123'}}).dd.a.m = b.dd.c.ccc;"
 
-// code = "function a(){console.log(1)} a();"
 
 // code = fs.readFileSync("./jquery.js") + ''
 // code = fs.readFileSync("./md5.js") + ''
@@ -1509,15 +1506,14 @@ const test = {
     }
 }
 
-// var a = +new Date();
+var a = +new Date();
 ast = transform_js(ast);
-
 traverse(ast, test);
 opcode = backfill_opcode(opcode, mode.backfill_CONSTANT, OPCODE.PUSH_CONSTANT);
 fs.writeFileSync("./opcode.txt", JSON.stringify(opcode));
 fs.writeFileSync("./test_out.js", generator(ast).code);
+console.log("翻译耗时 -> ", +new Date() - a);
 
-// console.log(+new Date() - a);
 // var opcode_str = opcode.map((item) =>{ return String.fromCharCode(item+32)}).join('');
 // fs.writeFileSync("./opcode.txt", opcode_str);
 // console.log(obj);
@@ -1529,15 +1525,18 @@ fs.writeFileSync("./test_out.js", generator(ast).code);
 
 /* 生成一份新的vmp代码 */
 var junk_func_name = [];
+/* 替换运算的概率 1/2 */
 var junk_code_rate = 2;
+/* 不添加函数的概率 */
+var not_new_junk_rate = 3;
 /* vm方法复制几倍 */
-var vm_copy_count = times;
+var vm_copy_count = 10;
 /* 花指令 */
 const junkCodeModule = {
     'FunctionDeclaration'(path) {
         if (!(path.node.id.name === "vm_enter")) return;
         // 保存path scope里的 二项式花指令函数
-        let func_operator = {};
+        // let func_operator = {};
         var all_func_node = [];
         var all_func_id_node = [];
         // 保存path scope里的 方法调用花指令函数
@@ -1558,7 +1557,7 @@ const junkCodeModule = {
                         let func_2;
                         let funcNameIdentifier;
                         let funcNameIdentifier1;
-                        if (globalFuncNameIdentifier.hasOwnProperty(operator) && chance(junk_code_rate)) {
+                        if (globalFuncNameIdentifier.hasOwnProperty(operator) && chance(not_new_junk_rate)) {
                             funcNameIdentifier = globalFuncNameIdentifier[operator][rnd(0, globalFuncNameIdentifier[operator].length - 1)];
                         } else {
                             let BlockStatement = path_.getFunctionParent().get("body");
@@ -1727,7 +1726,7 @@ const junkCodeModule = {
                             let func;
                             let funcNameIdentifier;
 
-                            if (globalFuncNameIdentifier.hasOwnProperty("_" + operator) && chance(junk_code_rate)) {
+                            if (globalFuncNameIdentifier.hasOwnProperty("_" + operator) && chance(not_new_junk_rate)) {
                                 funcNameIdentifier = globalFuncNameIdentifier["_" + operator][rnd(0, globalFuncNameIdentifier["_" + operator].length - 1)];
                             } else {
                                 let BlockStatement = path_.getFunctionParent().get("body");
@@ -1776,13 +1775,19 @@ const junkCodeModule = {
             ])
         );
 
+        // var for_ast = parse(
+        //     "for (var i = 0; i < qa.length; i++) {\n" +
+        //     "    constant[\"$_\" + i] = qa[i].bind(constant).call.bind(qa[i].bind(constant));\n" +
+        //     "}");
         var for_ast = parse(
-            "for (var i = 0; i < qa.length; i++) {\n" +
-            "    constant[\"$_\" + i] = qa[i].bind(constant).call.bind(qa[i].bind(constant));\n" +
-            "}");
+            '(function () {\n' +
+            '            var i = 0;\n' +
+            '            qa.map(it => {constant["$_" + i] = it.bind(constant).call.bind(it.bind(constant)), i++})\n' +
+            '        })();'
+        )
         var for_node;
         traverse(for_ast, {
-            ForStatement(p) {
+            "ForStatement|ExpressionStatement"(p) {
                 for_node = p.node;
                 p.stop();
             }
@@ -1830,7 +1835,6 @@ const copy_block = {
         }
     }
 }
-
 /* vm_push 有概率转-> vm_push_2 老是用一个push 太假了
 *  get_value 有概率变成 -> vm_stack[--vm_esp]
 * */
@@ -1859,10 +1863,9 @@ const push_to_push2 = {
         }
     }
 }
-
 /* 复制vm代码 */
 var func_name_track = {};
-
+var _ = []
 const copy_vm_function = {
     FunctionDeclaration(path) {
         if (!(path.node.id.name === "vm_enter")) return;
@@ -1870,8 +1873,10 @@ const copy_vm_function = {
         var scope_ = path.scope;
         var func_node = [];
         var block_body = path.node.body.body;
+        var a; // 需要bind vm_stack this
         for (var i = 0; i < block_body.length; i++) {
             if (type.isFunctionDeclaration(block_body[i])) {
+                a = false;
                 old_func_name = block_body[i].id.name
                 func_name_track[old_func_name] = [old_func_name];
                 for (var j = 0; j < vm_copy_count; j++) {
@@ -1881,9 +1886,21 @@ const copy_vm_function = {
                         type.functionDeclaration(func_name, block_body[i].params, block_body[i].body)
                     );
                 }
+                (path.get("body").get("body"))[i].traverse({
+                    Identifier(p) {
+                        if (p.node.name === "vm_stack") {
+                            p.replaceWith(type.thisExpression());
+                            a = true;
+                        }
+
+                    }
+                });
+                if (a) _ = _.concat(func_name_track[old_func_name]);
                 // debugger;
+
             } else break;
         }
+        _ = shuffle(_);
         func_node = shuffle(func_node);
         block_body = func_node.concat(block_body);
         path.get("body").replaceWith(type.blockStatement(block_body));
@@ -1907,6 +1924,7 @@ const replace_vm_function = {
                 }
             }
             func_name = scope_.generateUidIdentifier("_" + Math.random().toString(36).substr(9)).name;
+            (j = _.indexOf(old_func_name)) > -1 ? _[j] = func_name : j;
             scope_.rename(old_func_name, func_name);
         }
     }
@@ -2166,6 +2184,58 @@ const replace_vm_call = {
         path.stop();
     }
 }
+
+const replace_vmstack_call = {
+    FunctionDeclaration(path) {
+        if (!(path.node.id.name === "vm_enter")) return;
+        var scope_ = path.scope;
+        var reference;
+        var block_body = path.node.body.body;
+        var vm_func_node = [];
+        var len;
+        var ran = ["d", "m", "h", "y", "zc", "cz", "hj", "jk", "lk", "ik"];
+        for (len = 0; len < _.length; len++) {
+            reference = scope_.getBinding(_[len]).referencePaths;
+            vm_func_node.push(_[len]);
+            for (var i = 0; i < reference.length; i++) {
+                if (reference[i].parentPath.type === "CallExpression") {
+                    reference[i].parentPath.node.arguments.unshift(
+                        type.identifier(ran[rnd(0, ran.length - 1)])
+                    );
+                    reference[i].replaceWith(
+                        type.memberExpression(
+                            type.identifier("zcj"),
+                            type.numericLiteral(len), true
+                        )
+                    );
+                }
+
+            }
+        }
+
+
+        var var_code = type.variableDeclaration("var", [
+            type.variableDeclarator(type.identifier("zcj"),
+                type.arrayExpression(_.map(it => type.identifier(it)))
+            )
+        ]);
+        var last_node = block_body.pop();
+        block_body.push(var_code);
+        var ast_ = parse("zcj = zcj.map(it => it.bind(vm_stack).call.bind(it.bind(vm_stack)));");
+        var bind_node;
+        traverse(ast_, {
+            ExpressionStatement(path) {
+                bind_node = path.node;
+                path.stop();
+            }
+        });
+        block_body.push(bind_node);
+        block_body.push(last_node);
+        path.get("body").replaceWith(type.blockStatement(block_body));
+        path.stop();
+    }
+}
+
 /* opcode 回填 */
 const return_opcode = {
     MemberExpression(path) {
@@ -2189,7 +2259,6 @@ const return_opcode = {
 
     }
 }
-
 /*
 y = h &= d; -> y = h = h & d;
 */
@@ -2219,31 +2288,35 @@ const delete_code = {
 
 // var vm_code = fs.readFileSync("./vm_enter.js") + '';
 function new_vmp_code() {
-    var vm_code = fs.readFileSync("./new_vm_enter.js") + '';
+    a = +new Date();
 
+    var vm_code = fs.readFileSync("./new_vm_enter.js") + '';
     ast = parse(vm_code);
     // traverse(ast, noname);
     traverse(ast, delete_code);
     traverse(ast, copy_block);
     ast = parse(generator(ast).code);
-
     traverse(ast, push_to_push2);
-    ast = parse(generator(ast).code);
     traverse(ast, add_dead_code);
     ast = parse(generator(ast).code);
     traverse(ast, copy_vm_function);
     ast = parse(generator(ast).code);
     traverse(ast, replace_vm_function);
     traverse(ast, return_opcode);
+    traverse(ast, replace_vmstack_call);
 
     // 有问题啊!!!!!!!!!!!!!!!
-    /* 这里把vm方法复制 */
+    /* 生成花指令函数 */
     traverse(ast, junkCodeModule);
     ast = parse(generator(ast).code);
     traverse(ast, replace_call);
 
+
+    console.log("vmp混淆耗时 -> ", +new Date() - a);
+
     // ast = parse(generator(ast).code);
     // traverse(ast, replace_vm_call);
+    a = +new Date();
 
     var vmp_code = generator(ast).code;
     vmp_code = vmp_code.replace('fs.readFileSync("./opcode.txt") + \'\'', "'" + JSON.stringify(opcode) + "'");
@@ -2251,12 +2324,13 @@ function new_vmp_code() {
     vmp_code = obfuscate(vmp_code);
     fs.writeFileSync("./vmp_out.js", vmp_code);
 
+    console.log("obfuscate混淆耗时 -> ", +new Date() - a);
+
 }
 
 if (vmp_turn) {
     new_vmp_code();
 }
-
 
 /* 以下都是废弃的 */
 

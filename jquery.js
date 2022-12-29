@@ -238,9 +238,8 @@
 
                         // Don't bring in undefined values
                     } else if (copy !== undefined) {
-                        console.log("target[name] call ", name);
+                        console.log("target[name] call ");
                         target[name] = copy;
-                        // console.log("target[name] call after ", copy);
                     }
                 }
             }
@@ -963,7 +962,6 @@
              * @param {Function} fn Passed the created div and expects a boolean result
              */
             function assert(fn) {
-                console.log("assert document => ", document);
                 var div = document.createElement("div");
                 try {
                     // console.log("assert => call ", div);
@@ -971,10 +969,8 @@
                 } catch (e) {
                     return false;
                 } finally {
-                    console.log("div.parentNode finally ", div.parentNode);
                     // Remove from its parent by default
                     if (div.parentNode) {
-                        console.log("finally div.parentNode.removeChild(div);");
                         div.parentNode.removeChild(div);
                     }
                     // release memory in IE
@@ -1078,7 +1074,6 @@
                 return context && typeof context.getElementsByTagName !== "undefined" && context;
             }
 
-            console.log("Sizzle => ", Sizzle);
 // Expose support vars for convenience
             support = Sizzle.support = {};
 
@@ -1102,6 +1097,7 @@
             setDocument = Sizzle.setDocument = function (node) {
                 var hasCompare, parent,
                     doc = node ? node.ownerDocument || node : preferredDoc;
+
                 // If no document and documentElement is available, return
                 if (doc === document || doc.nodeType !== 9 || !doc.documentElement) {
                     return document;
@@ -1111,8 +1107,6 @@
                 document = doc;
                 docElem = doc.documentElement;
                 parent = doc.defaultView;
-
-                console.log("document => ", document);
 
                 // Support: IE>8
                 // If iframe document is assigned to "document" variable and if iframe has been reloaded,
@@ -1133,7 +1127,7 @@
 
                 /* Attributes
 	---------------------------------------------------------------------- */
-                console.log("support.attributes = assert call", document);
+
                 // Support: IE<8
                 // Verify that getAttribute really returns attributes and not properties
                 // (excepting IE8 booleans)
@@ -1144,7 +1138,7 @@
 
                 /* getElement(s)By*
 	---------------------------------------------------------------------- */
-                console.log("support.getElementsByTagName = assert call");
+
                 // Check if getElementsByTagName("*") returns only elements
                 support.getElementsByTagName = assert(function (div) {
                     div.appendChild(doc.createComment(""));
@@ -1247,10 +1241,8 @@
                 // So, we allow :focus to pass through QSA all the time to avoid the IE error
                 // See http://bugs.jquery.com/ticket/13378
                 rbuggyQSA = [];
-                console.log("(support.qsa = rnative.test(doc.querySelectorAll)) call ");
                 // console.log("判断 => ", support.qsa = rnative.test(doc.querySelectorAll))
                 if ((support.qsa = rnative.test(doc.querySelectorAll))) {
-                    console.log("if ((support.qsa = rnative.test(doc.querySelectorAll))) { enter");
                     // Build QSA regex
                     // Regex strategy adopted from Diego Perini
                     assert(function (div) {
@@ -1296,7 +1288,7 @@
                             rbuggyQSA.push(".#.+[+~]");
                         }
                     });
-                    console.log("assert(function (div) {  doc =>", doc);
+
                     assert(function (div) {
                         // Support: Windows 8 Native Apps
                         // The type and name attributes are restricted during .innerHTML assignment
@@ -2167,7 +2159,6 @@
                         // Cache the tokens
                         tokenCache(selector, groups).slice(0);
             };
-
             // console.log("tokenize = Sizzle.tokenize call");
 
             function toSelector(tokens) {
@@ -2646,10 +2637,10 @@
 // Always assume duplicates if they aren't passed to the comparison function
             support.detectDuplicates = !!hasDuplicate;
 
-            console.log("setDocument call before=>");
+            // console.log("setDocument call before=>");
 // Initialize against the default document
             setDocument();
-            console.log("setDocument call after=>");
+            // console.log("setDocument call after=>");
 // Support: Webkit<537.32 - Safari 6.0.3/Chrome 25 (fixed in Chrome 27)
 // Detached nodes confoundingly follow *each other*
 
@@ -2940,8 +2931,8 @@
 
 // Give the init function the jQuery prototype for later instantiation
     init.prototype = jQuery.fn;
-    console.log("init  => ", init);
-    console.log("jQuery.fn.init  => ", jQuery.fn.init);
+    // console.log("init  => ", init);
+    // console.log("jQuery.fn.init  => ", jQuery.fn.init);
 // Initialize central reference
     rootjQuery = jQuery(document);
 
@@ -3508,7 +3499,7 @@
 
     jQuery.fn.ready = function (fn) {
         // Add the callback
-        console.log("jQuery.ready.promise().done(fn); => call ");
+        // console.log("jQuery.ready.promise().done(fn); => call ");
         jQuery.ready.promise().done(fn);
 
         return this;
@@ -3601,8 +3592,6 @@
             // we once tried to use readyState "interactive" here, but it caused issues like the one
             // discovered by ChrisS here: http://bugs.jquery.com/ticket/12282#comment:15
             // console.log("document.readyState === \"complete\" => ", document.readyState);
-            console.log("document.readyState === \"complete\" => ", document.readyState, document.readyState === "complete");
-            document.readyState = "complete";
             if (document.readyState === "complete") {
                 console.log("setTimeout(jQuery.ready) call => ", jQuery.ready);
                 // Handle it asynchronously to allow scripts the opportunity to delay ready
@@ -8727,26 +8716,22 @@
                 func = dataTypeExpression;
                 dataTypeExpression = "*";
             }
-            // console.log("addToPrefiltersOrTransports => enter",dataTypeExpression.toLowerCase().match(rnotwhite));
+
             var dataType,
                 i = 0,
                 dataTypes = dataTypeExpression.toLowerCase().match(rnotwhite) || [];
-            console.log("dataTypes = dataTypeExpression.t after");
+
             if (jQuery.isFunction(func)) {
-                console.log("if (jQuery.isFunction(func)) {   enter");
                 // For each dataType in the dataTypeExpression
                 while ((dataType = dataTypes[i++])) {
                     // Prepend if requested
                     if (dataType.charAt(0) === "+") {
                         dataType = dataType.slice(1) || "*";
-                        console.log("(structure[dataType] = structure[dataType] || []) before");
                         (structure[dataType] = structure[dataType] || []).unshift(func);
-                        console.log("(structure[dataType] = structure[dataType] || [])");
+
                         // Otherwise append
                     } else {
-                        console.log("(structure[dataType] = structure[dataType] || []) before");
                         (structure[dataType] = structure[dataType] || []).push(func);
-                        console.log("(structure[dataType] = structure[dataType] || []) after");
                     }
                 }
             }

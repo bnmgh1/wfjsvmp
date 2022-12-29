@@ -166,7 +166,7 @@ function obfuscate(vm_code) {
             });
         }
     }
-
+    /* if 类似瑞数那种排序if */
     const parsetoSy = {
         SwitchStatement(path) {
             function diedaidata(shuenxun) {
@@ -257,7 +257,6 @@ function obfuscate(vm_code) {
 
         }
     }
-
     /* 逗号表达式*/
     const expToComma = {
         'BlockStatement'(path) {
@@ -318,28 +317,6 @@ function obfuscate(vm_code) {
             beautify: true,
         },
     });
-    // r = UglifyJS.minify(r.code, {
-    //     compress: {
-    //         drop_debugger: false,
-    //         hoist_vars: false,
-    //         join_vars: false,
-    //         sequences: false,
-    //         inline: false,
-    //         loops: false,
-    //         reduce_funcs: false,
-    //         reduce_vars: false,
-    //         collapse_vars: false,
-    //         comparisons: false,
-    //         computed_props: false,
-    //         conditionals: true,
-    //         evaluate: true,
-    //         expression: false,
-    //     },
-    //     output: {
-    //         bracketize: true,
-    //         beautify: true,
-    //     },
-    // });
     return r.code;
     // fs.writeFileSync("./vmp_out.js", r.code);
 }

@@ -142,7 +142,7 @@ var CryptoJS = CryptoJS || (function (Math, undefined) {
                 let g = latin1Str.charCodeAt(i)
                 let gh = (g & 0xff) << (24 - (i % 4) * 8)
                 console.log("g",g, gh)
-                
+
                 words[i >>> 2] |= gh;
             }
             console.log("words", JSON.stringify(words))
