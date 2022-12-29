@@ -47,6 +47,7 @@ var OPCODE = {
     DELETE: 46,
     DEBUG: 47,
     FORIN: 48,
+    FINALLY: 49,
 
     RETURN: 88,
     IS_TRUE: 89,
@@ -101,7 +102,8 @@ var NEW_OPCODE = {};
 var NEW_OPCODE1 = {};
 
 /* 一个指令对应几种字节码, 也意味着vmp代码cases会翻几倍 */
-var times = 10;
+var times = 20, turn, vmp_turn;
+turn = vmp_turn = 1;
 /* 用字符串symbol来进行函数调用计算结果. 使用频率为 1/4 */
 var use_symbol_rate = 4;
 
@@ -121,6 +123,18 @@ var mode = {
 }
 /* 保存不同变量的作用域进行数字命名,不是修改js,再作用域下添加一个id对象. 使用ast直接对js重命名变量真的很卡 */
 var identifier_binding_track = [];
+
+/* PASS的opcode 直接删了占用性能 */
+function delete_opcode(opcode, mode) {
+    var index;
+    while (true) {
+        index = opcode.indexOf(mode);
+        if (index !== -1) {
+            opcode.splice(index, 1);
+        } else break;
+    }
+    return opcode;
+}
 
 /* 适用于回填单个指令的方法 */
 function backfill_opcode(opcode, mode, replace_code) {
@@ -239,6 +253,8 @@ function generate(node) {
             break
         case "VariableDeclarator":
             /* 赋值主要是要从变量池里拿到对象直接进行操作,不同于把值或者对象push到堆栈里 */
+            opcode = opcode.concat(delete_opcode(generate(node.get("id")), mode.backfill_identifier));
+            // opcode = backfill_opcode(opcode, mode.backfill_identifier, OPCODE.MOV_VAR);
             if (!node.node.init) {
                 /*没有init push null*/
                 opcode.push(OPCODE.PUSH_UNDEFINED);
@@ -246,8 +262,8 @@ function generate(node) {
                 opcode = opcode.concat(generate(node.get("init")));
             }
             opcode = backfill_opcode(opcode, mode.backfill_identifier, OPCODE.PUSH_VAR);
-            opcode = opcode.concat(generate(node.get("id")));
-            opcode = backfill_opcode(opcode, mode.backfill_identifier, OPCODE.MOV_VAR);
+            opcode.push(OPCODE.MOV_VAR);
+            opcode.push(OPCODE.DECREMENT_STACK);
             break
         case "NumericLiteral":
             opcode.push(OPCODE.PUSH_NUM);
@@ -268,7 +284,7 @@ function generate(node) {
         case "ObjectProperty":
             /* 要不就直接提取var b = {"a":"c"} 他的key, b["a"] = "c"; 酱紫容易写 他妈的 , 不写逻辑了 */
             var key_opcode = generate(node.get("key"));
-            key_opcode = backfill_opcode(key_opcode, mode.backfill_identifier, OPCODE.PASS);
+            key_opcode = delete_opcode(key_opcode, mode.backfill_identifier);
             var value_opcode = generate(node.get("value"));
             opcode = opcode.concat(key_opcode);
             opcode = opcode.concat(value_opcode);
@@ -310,7 +326,8 @@ function generate(node) {
         case "UnaryExpression":
             var operator = node.node.operator;
             if (operator === "delete") {
-                opcode = opcode.concat(backfill_opcode(generate(node.get("argument")), mode.backfill_member_expression, OPCODE.PASS));
+                // opcode = opcode.concat(backfill_opcode(generate(node.get("argument")), mode.backfill_member_expression, OPCODE.PASS));
+                opcode = opcode.concat(delete_opcode(generate(node.get("argument")), mode.backfill_member_expression));
                 opcode.push(OPCODE.DELETE)
             } else {
                 // opcode = opcode.concat(strToOpcode(node.node.operator));
@@ -339,9 +356,28 @@ function generate(node) {
             var finalizer_opcode = [];
             if (!!node.node.finalizer) {
                 finalizer_opcode = generate(node.get("finalizer"));
+                opcode.push(OPCODE.FINALLY);
+                opcode.push(finalizer_opcode.length);
                 opcode = opcode.concat(finalizer_opcode);
             }
             break
+        case "CatchClause":
+            /* catch(e){}  */
+            var param_opcode = generate(node.get("param"))
+            var block_opcode = generate(node.get("body"));
+            // opcode.push(OPCODE.CATCH);
+            // opcode.push(param_opcode.length + block_opcode.length);
+            /* push e参数 */
+            var p_opcode = []
+            // p_opcode = p_opcode.concat(backfill_opcode(param_opcode, mode.backfill_identifier, OPCODE.PASS));
+            p_opcode = p_opcode.concat(delete_opcode(param_opcode, mode.backfill_identifier));
+            opcode.push(p_opcode.length);
+            opcode = opcode.concat(p_opcode);
+            opcode.push(block_opcode.length + 1);
+            opcode.push(OPCODE.MOV_VAR);
+            opcode = opcode.concat(block_opcode);
+            break
+
 
         /*比较麻烦的节点*/
         case "Identifier":
@@ -349,7 +385,8 @@ function generate(node) {
             /* 都不是的则直接命名带上id */
             var name = node.node.name;
             if (name === "arguments") {
-                opcode = opcode.concat(strToOpcode(name));
+                // opcode = opcode.concat(strToOpcode(name));
+                opcode = opcode.concat(strToOpcode("$5"));
                 opcode.push(OPCODE.PUSH_CONSTANT);
                 opcode.push(mode.backfill_identifier);
                 break
@@ -448,42 +485,79 @@ function generate(node) {
             var operator = node.node.operator;
             var right_opcode = generate(node.get("right"));
             var left_opcode = generate(node.get("left"));
-            if (node.node.operator !== "=") {
-                // console.log("AssignmentExpression 符号 => ", node.node.operator);
-                if (chance(use_symbol_rate)) {
-                    opcode = opcode.concat(strToOpcode(operator));
-                    opcode = opcode.concat(left_opcode);
-                    opcode = opcode.concat(right_opcode);
-                    opcode.push(OPCODE.COMPUTE);
-                } else {
-                    opcode = opcode.concat(left_opcode);
-                    opcode = opcode.concat(right_opcode);
-                    opcode.push(OPCODE[operator]);
-                }
-
-            } else {
+            if (node.get("right").type == "AssignmentExpression") {
                 opcode = opcode.concat(right_opcode);
+                opcode.push(OPCODE.DECREMENT_STACK);
+                switch (node.get("left").type) {
+                    case "Identifier":
+                        /* 要用常量池里的对象去接收值呢 */
+                        // opcode = opcode.concat(backfill_opcode(left_opcode, mode.backfill_identifier, OPCODE.PASS));
+                        opcode = opcode.concat(delete_opcode(left_opcode, mode.backfill_identifier));
+                        break
+                    case "MemberExpression":
+                        opcode = opcode.concat(left_opcode);
+                        /* 遍历MemberExpression 节点, 会获取到值, 把最后GET_OBJ指令替换成SET_OBJ即可*/
+                        // opcode[opcode.lastIndexOf(mode.backfill_member_expression)] = OPCODE.PASS;
+                        opcode.splice(opcode.lastIndexOf(mode.backfill_member_expression), 1);
+                        /* 其余的都直接替换成 GET_OBJ,其实这里可以不写这个代码,运行到最后会自动补全get obj 指令 */
+                        opcode = backfill_opcode(opcode, mode.backfill_member_expression, OPCODE.GET_OBJ);
+                        break
+                    default:
+                        debugger;
+                }
+                opcode = opcode.concat(generate(node.get("right").get("left")));
+            } else {
+                switch (node.get("left").type) {
+                    case "Identifier":
+                        /* 要用常量池里的对象去接收值呢 */
+                        // opcode = opcode.concat(backfill_opcode(generate(node.get("left")), mode.backfill_identifier, OPCODE.PASS));
+                        opcode = opcode.concat(delete_opcode(generate(node.get("left")), mode.backfill_identifier));
+                        break
+                    case "MemberExpression":
+                        opcode = opcode.concat(left_opcode);
+                        /* 遍历MemberExpression 节点, 会获取到值, 把最后GET_OBJ指令替换成SET_OBJ即可*/
+                        // opcode[opcode.lastIndexOf(mode.backfill_member_expression)] = OPCODE.PASS;
+                        opcode.splice(opcode.lastIndexOf(mode.backfill_member_expression), 1);
+                        /* 其余的都直接替换成 GET_OBJ,其实这里可以不写这个代码,运行到最后会自动补全get obj 指令 */
+                        opcode = backfill_opcode(opcode, mode.backfill_member_expression, OPCODE.GET_OBJ);
+                        break
+                    default:
+                        debugger;
+                }
+                if (node.node.operator !== "=") {
+                    // console.log("AssignmentExpression 符号 => ", node.node.operator);
+                    if (chance(use_symbol_rate)) {
+                        opcode = opcode.concat(strToOpcode(operator));
+                        opcode = opcode.concat(left_opcode);
+                        opcode = opcode.concat(right_opcode);
+                        opcode.push(OPCODE.COMPUTE);
+                    } else {
+                        opcode = opcode.concat(left_opcode);
+                        opcode = opcode.concat(right_opcode);
+                        opcode.push(OPCODE[operator]);
+                    }
+
+                } else {
+                    opcode = opcode.concat(right_opcode);
+                }
             }
             switch (node.get("left").type) {
                 case "Identifier":
                     /* 要用常量池里的对象去接收值呢 */
-                    opcode = opcode.concat(backfill_opcode(left_opcode, mode.backfill_identifier, OPCODE.MOV_VAR));
+                    opcode.push(OPCODE.MOV_VAR);
                     break
                 case "MemberExpression":
-                    opcode = opcode.concat(left_opcode);
-                    /* 遍历MemberExpression 节点, 会获取到值, 把最后GET_OBJ指令替换成SET_OBJ即可*/
-                    opcode[opcode.lastIndexOf(mode.backfill_member_expression)] = OPCODE.SET_OBJ;
-                    /* 其余的都直接替换成 GET_OBJ,其实这里可以不写这个代码,运行到最后会自动补全get obj 指令 */
-                    opcode = backfill_opcode(opcode, mode.backfill_member_expression, OPCODE.GET_OBJ);
+                    opcode.push(OPCODE.SET_OBJ);
                     break
                 default:
                     debugger;
             }
+
             /* if ((a = 1)) 这种的 怪恶心的 , 怎么判断是否会用到这个值
             *  */
             // opcode = push_update_stack(opcode, node);
-            if (node.parentPath.type !== "ExpressionStatement") {
-                opcode.push(OPCODE.UPDATE_STACK);
+            if ("ExpressionStatement|".indexOf(node.parentPath.type) > 0) {
+                opcode.push(OPCODE.DECREMENT_STACK);
             }
             break
         case "BinaryExpression":
@@ -510,11 +584,13 @@ function generate(node) {
                 opcode = opcode.concat(str_opcode);
                 if (type.isIdentifier(node.node.argument)) {
                     /* 直接 push 参数名 */
-                    opcode = opcode.concat(backfill_opcode(generate(node.get("argument")), mode.backfill_identifier, OPCODE.PASS));
+                    // opcode = opcode.concat(backfill_opcode(generate(node.get("argument")), mode.backfill_identifier, OPCODE.PASS));
+                    opcode = opcode.concat(delete_opcode(generate(node.get("argument")), mode.backfill_identifier));
                     opcode.push(OPCODE.UPDATE);
 
                 } else if (type.isMemberExpression(node.node.argument)) {
-                    opcode = opcode.concat(backfill_opcode(generate(node.get("argument")), mode.backfill_member_expression, OPCODE.PASS));
+                    // opcode = opcode.concat(backfill_opcode(generate(node.get("argument")), mode.backfill_member_expression, OPCODE.PASS));
+                    opcode = opcode.concat(delete_opcode(generate(node.get("argument")), mode.backfill_member_expression));
                     opcode.push(OPCODE.UPDATE);
                 } else {
                     debugger;
@@ -529,10 +605,12 @@ function generate(node) {
                 opcode = opcode.concat(str_opcode);
                 if (type.isIdentifier(node.node.argument)) {
                     /* 先把值push到堆栈里给他们用,然后++ */
-                    opcode = opcode.concat(backfill_opcode(generate(node.get("argument")), mode.backfill_identifier, OPCODE.PASS));
+                    // opcode = opcode.concat(backfill_opcode(generate(node.get("argument")), mode.backfill_identifier, OPCODE.PASS));
+                    opcode = opcode.concat(delete_opcode(generate(node.get("argument")), mode.backfill_identifier));
                     opcode.push(OPCODE.UPDATE);
                 } else if (type.isMemberExpression(node.node.argument)) {
-                    opcode = opcode.concat(backfill_opcode(generate(node.get("argument")), mode.backfill_member_expression, OPCODE.PASS));
+                    // opcode = opcode.concat(backfill_opcode(generate(node.get("argument")), mode.backfill_member_expression, OPCODE.PASS));
+                    opcode = opcode.concat(delete_opcode(generate(node.get("argument")), mode.backfill_member_expression));
                     opcode.push(OPCODE.UPDATE);
                 } else {
                     debugger;
@@ -550,16 +628,17 @@ function generate(node) {
             if (node.node.computed) {
                 property_opcode = backfill_opcode(property_opcode, mode.backfill_identifier, OPCODE.PUSH_VAR);
             } else {
-                property_opcode = backfill_opcode(property_opcode, mode.backfill_identifier, OPCODE.PASS);
-                property_opcode = backfill_opcode(property_opcode, mode.backfill_CONSTANT, OPCODE.PASS);
+                // property_opcode = backfill_opcode(property_opcode, mode.backfill_identifier, OPCODE.PASS);
+                // property_opcode = backfill_opcode(property_opcode, mode.backfill_CONSTANT, OPCODE.PASS);
+
+                property_opcode = delete_opcode(property_opcode, mode.backfill_identifier);
+                property_opcode = delete_opcode(property_opcode, mode.backfill_CONSTANT);
             }
+            // opcode = opcode.concat(object_opcode);
             opcode = opcode.concat(property_opcode);
             opcode = opcode.concat(object_opcode);
             /* push get 还是 set */
             opcode.push(mode.backfill_member_expression);
-            // if (node.parentPath.type === "AssignmentExpression"){
-            //     opcode.push(OPCODE.UPDATE_STACK);
-            // }
             break
         case "CallExpression":
             var len = node.node.arguments.length;
@@ -572,8 +651,9 @@ function generate(node) {
             opcode = opcode.concat(backfill_opcode(callee_opcode, mode.backfill_member_expression, OPCODE.GET_OBJ));
             switch (node.get("callee").type) {
                 case "MemberExpression":
-                    /* 这里还需要把调用者push到堆栈里 */
-                    opcode = opcode.concat(generate(node.get("callee").get("object")));
+                    /* 这里还需要把调用者push到堆栈里,这里直接让堆栈索引+1 解决掉重复获取调用者造成性能损失 */
+                    // opcode = opcode.concat(generate(node.get("callee").get("object")));
+                    opcode.push(OPCODE.UPDATE_STACK);
                     break
                 case "AssignmentExpression":
                     /* 赋值完以后堆栈++ 就得到了方法, 然后push调用者 */
@@ -591,9 +671,20 @@ function generate(node) {
                 // debugger;
             }
             opcode.push(OPCODE.APPLY);
+            if ("ExpressionStatement".indexOf(node.parentPath.type) > 0) {
+                opcode.push(OPCODE.DECREMENT_STACK);
+            }
             break
         case "FunctionDeclaration":
             /* 第一步先把传参push到堆栈里组成数组 */
+            if (type.isIdentifier(node.node.id)) {
+                /* 加入到变量池里 */
+                // opcode = opcode.concat(backfill_opcode(generate(node.get("id")), mode.backfill_identifier, OPCODE.PASS));
+                opcode = opcode.concat(delete_opcode(generate(node.get("id")), mode.backfill_identifier, OPCODE.PASS));
+            } else {
+                debugger;
+            }
+
             var len = node.node.params.length;
             var paramopcode = [];
             for (var i = 0; i < len; i++) {
@@ -606,8 +697,10 @@ function generate(node) {
                         debugger;
                 }
             }
-            paramopcode = backfill_opcode(paramopcode, mode.backfill_identifier, OPCODE.PASS);
-            paramopcode = backfill_opcode(paramopcode, mode.backfill_CONSTANT, OPCODE.PASS);
+            // paramopcode = backfill_opcode(paramopcode, mode.backfill_identifier, OPCODE.PASS);
+            // paramopcode = backfill_opcode(paramopcode, mode.backfill_CONSTANT, OPCODE.PASS);
+            paramopcode = delete_opcode(paramopcode, mode.backfill_identifier);
+            paramopcode = delete_opcode(paramopcode, mode.backfill_CONSTANT);
             /* 把参数组成一个数组并push到堆栈里 */
             paramopcode.push(OPCODE.NEW_ARRAY);
             paramopcode.push(len);
@@ -617,16 +710,23 @@ function generate(node) {
             var blockSta_opcode = generate(node.get("body"));
             opcode.push(blockSta_opcode.length);
             opcode = opcode.concat(blockSta_opcode);
+            opcode.push(OPCODE.MOV_VAR);
             // debugger;
-            if (type.isIdentifier(node.node.id)) {
-                /* 加入到变量池里 */
-                opcode = opcode.concat(backfill_opcode(generate(node.get("id")), mode.backfill_identifier, OPCODE.MOV_VAR));
-            } else {
-                debugger;
-            }
+
             break
         case "FunctionExpression":
             /* 第一步先把传参push到堆栈里组成数组 */
+            if (!!node.node.id) {
+                if (type.isIdentifier(node.node.id)) {
+                    /* 加入到变量池里 */
+                    // opcode = opcode.concat(backfill_opcode(generate(node.get("id")), mode.backfill_identifier, OPCODE.PASS));
+                    opcode = opcode.concat(delete_opcode(generate(node.get("id")), mode.backfill_identifier));
+                    // 这里感觉要判断一下最好
+                    // opcode.push(OPCODE.UPDATE_STACK);
+                } else {
+                    debugger;
+                }
+            }
             var len = node.node.params.length;
             var paramopcode = [];
             for (var i = 0; i < len; i++) {
@@ -639,8 +739,10 @@ function generate(node) {
                         debugger;
                 }
             }
-            paramopcode = backfill_opcode(paramopcode, mode.backfill_identifier, OPCODE.PASS);
-            paramopcode = backfill_opcode(paramopcode, mode.backfill_CONSTANT, OPCODE.PASS);
+            // paramopcode = backfill_opcode(paramopcode, mode.backfill_identifier, OPCODE.PASS);
+            // paramopcode = backfill_opcode(paramopcode, mode.backfill_CONSTANT, OPCODE.PASS);
+            paramopcode = delete_opcode(paramopcode, mode.backfill_identifier);
+            paramopcode = delete_opcode(paramopcode, mode.backfill_CONSTANT);
             /* 把参数组成一个数组并push到堆栈里 */
             paramopcode.push(OPCODE.NEW_ARRAY);
             paramopcode.push(len);
@@ -652,12 +754,7 @@ function generate(node) {
             opcode = opcode.concat(blockSta_opcode);
             if (!!node.node.id) {
                 if (type.isIdentifier(node.node.id)) {
-                    /* 加入到变量池里 */
-                    opcode = opcode.concat(backfill_opcode(generate(node.get("id")), mode.backfill_identifier, OPCODE.MOV_VAR));
-                    // 这里感觉要判断一下最好
-                    opcode.push(OPCODE.UPDATE_STACK);
-                } else {
-                    debugger;
+                    opcode.push(OPCODE.MOV_VAR);
                 }
             }
             break
@@ -711,24 +808,45 @@ function generate(node) {
             opcode = backfill_break(opcode);
             break
         case "ForInStatement":
-            /* for(var a in b) {} 直接用AST改写成For循环即可,不想写.
-                转不了了 , 开写
+            /*
+            for(var a in b) {} 直接用AST改写成For循环即可,不想写.
+            转不了了 , 开写
             */
             var left_opcode;
             var right_opcode = generate(node.get("right"));
-            opcode = opcode.concat(right_opcode);
-            opcode.push(OPCODE.FORIN);
-            if (node.get("left").type === "VariableDeclaration") {
-                left_opcode = backfill_opcode(generate(node.get("left").get("declarations")[0].get("id")), mode.backfill_identifier,
-                    OPCODE.MOV_VAR);
-            } else {
-                left_opcode = backfill_opcode(generate(node.get("left")), mode.backfill_identifier,
-                    OPCODE.MOV_VAR);
+            switch (node.get("left").type) {
+                case "VariableDeclaration":
+                    // left_opcode = backfill_opcode(generate(node.get("left").get("declarations")[0].get("id")), mode.backfill_identifier,
+                    //     OPCODE.PASS);
+                    left_opcode = delete_opcode(generate(node.get("left").get("declarations")[0].get("id")), mode.backfill_identifier);
+                    break
+                case "Identifier":
+                    // left_opcode = backfill_opcode(generate(node.get("left")), mode.backfill_identifier,
+                    //     OPCODE.PASS);
+                    left_opcode = delete_opcode(generate(node.get("left")), mode.backfill_identifier);
+                    break
+                case "MemberExpression":
+                    // left_opcode = backfill_opcode(generate(node.get("left")), mode.backfill_member_expression,
+                    //     OPCODE.PASS);
+                    left_opcode = delete_opcode(generate(node.get("left")), mode.backfill_member_expression);
+                    break
             }
 
-            var block_opcode = generate(node.get("body"));
-            opcode.push(left_opcode.length + block_opcode.length + 2);
             opcode = opcode.concat(left_opcode);
+            opcode = opcode.concat(right_opcode);
+            opcode.push(OPCODE.FORIN);
+            var block_opcode = generate(node.get("body"));
+            opcode.push(block_opcode.length + 3);
+
+            switch (node.get("left").type) {
+                case "VariableDeclaration":
+                case "Identifier":
+                    opcode.push(OPCODE.MOV_VAR);
+                    break
+                case "MemberExpression":
+                    opcode.push(OPCODE.SET_OBJ);
+                    break
+            }
             opcode = opcode.concat(block_opcode);
             opcode.push(mode.backfill_continue);
             opcode.push("占个字节数");
@@ -778,16 +896,6 @@ function generate(node) {
             opcode.push(mode.backfill_continue);
             opcode.push("占个字节数");
 
-            break
-        case "CatchClause":
-            /* catch(e){}  */
-            var param_opcode = generate(node.get("param"))
-            var block_opcode = generate(node.get("body"));
-            // opcode.push(OPCODE.CATCH);
-            // opcode.push(param_opcode.length + block_opcode.length);
-            /* push e参数 */
-            opcode = opcode.concat(backfill_opcode(param_opcode, mode.backfill_identifier, OPCODE.MOV_VAR));
-            opcode = opcode.concat(block_opcode);
             break
         case "SwitchStatement":
             /* 恶心节点之1, 确实如果break不去找到要跳过的索引,这个就很难做 */
@@ -1000,7 +1108,11 @@ const add_block = {
         if (path.get("consequent").type !== "BlockStatement") {
             path.get("consequent").replaceWith(type.blockStatement([path.node.consequent]));
             path.get("consequent").skip();
-
+        }
+        var alternate_node = path.node.alternate;
+        if (!!alternate_node && "IfStatement|BlockStatement".indexOf(path.get("alternate").type) === -1) {
+            path.get("alternate").replaceWith(type.blockStatement([alternate_node]));
+            path.get("alternate").skip();
         }
     }
 
@@ -1187,7 +1299,7 @@ function expand_opcode(i) {
         /* 指令对应的字节码 */
         var t = [];
         var code;
-        if (z === "BREAK" || z === "CONTINUE") {
+        if (z === "BREAK" || z === "CONTINUE" || z === "FINALLY" || z === "SKIP_BLOCK") {
             t.push(ALL_OPCODE.pop());
         } else {
             for (var m = 0; m < i; m++) {
@@ -1227,7 +1339,7 @@ function expand_opcode(i) {
 
 /* 改写js */
 function transform_js(ast) {
-    traverse(ast, deleteConsole);
+    // traverse(ast, deleteConsole);
     traverse(ast, arr_func_to_func);
     traverse(ast, change_obj_key);
     traverse(ast, tempToStr);
@@ -1248,7 +1360,10 @@ function transform_js(ast) {
 }
 
 /* 至少大于1 */
-// expand_opcode(times);
+if (turn) {
+    expand_opcode(times);
+}
+
 
 // console.log(NEW_OPCODE);
 
@@ -1368,17 +1483,19 @@ function transform_js(ast) {
 //     "}console.log('end')"
 // code = "var b,se = {};(function(){console})(),(b = se.aa = {'a':1,'c':'aaa','dd':{'ccc':'123'}}).dd.a.m = b.dd.c.ccc;"
 
+// code = "function a(){console.log(1)} a();"
 
-code = fs.readFileSync("./jquery.js") + ''
+// code = fs.readFileSync("./jquery.js") + ''
 // code = fs.readFileSync("./md5.js") + ''
 // code = fs.readFileSync("./CryptoJs.js") + ''
 // code = fs.readFileSync("./test1.js") + ''
-// code = fs.readFileSync("./test.js") + ''
+code = fs.readFileSync("./test.js") + ''
 // code = fs.readFileSync("./test_out.js") + ''
 
-// code = "var a = 0;while(true){a++;console.log(a);if(a>10){break;}else continue;console.log(1);}console.log('end')"
-// code = "var i = {'a':1,'b':3};for(var m in i){console.log(m);}console.log('end')"
-// code = "function a(c){var z,b,j;z = b = j = c = c || window;console.log(c);}a();"
+// code = "try{throw 1}catch(e){console.log(e);}finally{console.log('end')}console.log('zcj');"
+// code = "function a(){try{return 111}catch(e){}finally{console.log('end');return 222}}console.log(a());"
+// code = "var b,se={};(b = se.aa = {'a':1,'c':'aaa','dd':{'ccc':'123'}}).dd.m = b.dd.ccc;console.log(b);"
+
 
 var ast = parse(code);
 var opcode = [];
@@ -1394,18 +1511,21 @@ const test = {
 
 // var a = +new Date();
 ast = transform_js(ast);
+
 traverse(ast, test);
 opcode = backfill_opcode(opcode, mode.backfill_CONSTANT, OPCODE.PUSH_CONSTANT);
 fs.writeFileSync("./opcode.txt", JSON.stringify(opcode));
 fs.writeFileSync("./test_out.js", generator(ast).code);
+
 // console.log(+new Date() - a);
 // var opcode_str = opcode.map((item) =>{ return String.fromCharCode(item+32)}).join('');
 // fs.writeFileSync("./opcode.txt", opcode_str);
 // console.log(obj);
 
-for (var i in identifier_binding_track) {
-    console.log(identifier_binding_track[i].reNameId, " => ", identifier_binding_track[i].oldName);
-}
+// for (var i in identifier_binding_track) {
+//     console.log(identifier_binding_track[i].reNameId, " => ", identifier_binding_track[i].oldName);
+// }
+
 
 /* 生成一份新的vmp代码 */
 var junk_func_name = [];
@@ -1490,6 +1610,7 @@ const junkCodeModule = {
                                     type.returnStatement(
                                         type.sequenceExpression([conditionalExp1, type.callExpression(funcNameIdentifier1, [a, b])])
                                     )]));
+
                             // func = type.functionDeclaration(
                             //     funcNameIdentifier,
                             //     [a, b],
@@ -1556,44 +1677,44 @@ const junkCodeModule = {
                     }
                 },
                 AssignmentExpression(path_) {
-                    if (path_.getFunctionParent() === path && path_.parentPath.type === path_.type) {
-                        // 二项式计算
-                        let operator = path_.node.operator;
-                        if (operator != "=") {
-                            let left = path_.node.left;
-                            let right = path_.node.right;
-                            let a = type.identifier("a");
-                            let b = type.identifier("b");
-                            let func;
-                            let funcNameIdentifier;
-                            if (globalFuncNameIdentifier.hasOwnProperty(operator) && chance(junk_code_rate)) {
-                                funcNameIdentifier = globalFuncNameIdentifier[operator][rnd(0, globalFuncNameIdentifier[operator].length - 1)];
-                            } else {
-                                let BlockStatement = path_.getFunctionParent().get("body");
-                                funcNameIdentifier = BlockStatement.scope.generateUidIdentifier("_" + Math.random().toString(36).substr(9));
-                                if (!globalFuncNameIdentifier[operator]) {
-                                    globalFuncNameIdentifier[operator] = [];
-                                }
-                                globalFuncNameIdentifier[operator].push(funcNameIdentifier);
-                                func = type.functionDeclaration(
-                                    funcNameIdentifier,
-                                    [a, b],
-                                    type.blockStatement([type.returnStatement(
-                                        type.assignmentExpression(operator, a, b)
-                                    )])
-                                );
-                                // 这里把生成的方法,往函数作用域内最上方丢.
-                                // (方法可以生成的更恶心些) 嵌套2层,对数字进行计算操作,更具迷惑性
-                                //BlockStatement.node.body.unshift(func);
-                                all_func_node.push(func);
-                            }
-
-                            var call_node = type.callExpression(funcNameIdentifier, [left, right]);
-                            if (chance(junk_code_rate)) {
-                                path_.replaceWith(call_node);
-                            }
-                        }
-                    }
+                    // if (path_.getFunctionParent() === path && path_.parentPath.type === path_.type) {
+                    //     // 二项式计算
+                    //     let operator = path_.node.operator;
+                    //     if (operator != "=") {
+                    //         let left = path_.node.left;
+                    //         let right = path_.node.right;
+                    //         let a = type.identifier("a");
+                    //         let b = type.identifier("b");
+                    //         let func;
+                    //         let funcNameIdentifier;
+                    //         if (globalFuncNameIdentifier.hasOwnProperty(operator) && chance(junk_code_rate)) {
+                    //             funcNameIdentifier = globalFuncNameIdentifier[operator][rnd(0, globalFuncNameIdentifier[operator].length - 1)];
+                    //         } else {
+                    //             let BlockStatement = path_.getFunctionParent().get("body");
+                    //             funcNameIdentifier = BlockStatement.scope.generateUidIdentifier("_" + Math.random().toString(36).substr(9));
+                    //             if (!globalFuncNameIdentifier[operator]) {
+                    //                 globalFuncNameIdentifier[operator] = [];
+                    //             }
+                    //             globalFuncNameIdentifier[operator].push(funcNameIdentifier);
+                    //             func = type.functionDeclaration(
+                    //                 funcNameIdentifier,
+                    //                 [a, b],
+                    //                 type.blockStatement([type.returnStatement(
+                    //                     type.assignmentExpression(operator, a, b)
+                    //                 )])
+                    //             );
+                    //             // 这里把生成的方法,往函数作用域内最上方丢.
+                    //             // (方法可以生成的更恶心些) 嵌套2层,对数字进行计算操作,更具迷惑性
+                    //             //BlockStatement.node.body.unshift(func);
+                    //             all_func_node.push(func);
+                    //         }
+                    //
+                    //         var call_node = type.callExpression(funcNameIdentifier, [left, right]);
+                    //         if (chance(junk_code_rate)) {
+                    //             path_.replaceWith(call_node);
+                    //         }
+                    //     }
+                    // }
                 },
                 UnaryExpression(path_) {
                     if (path_.getFunctionParent() === path) {
@@ -1654,6 +1775,7 @@ const junkCodeModule = {
                     type.arrayExpression(all_func_id_node))
             ])
         );
+
         var for_ast = parse(
             "for (var i = 0; i < qa.length; i++) {\n" +
             "    constant[\"$_\" + i] = qa[i].bind(constant).call.bind(qa[i].bind(constant));\n" +
@@ -1666,6 +1788,7 @@ const junkCodeModule = {
             }
         });
         path.insertBefore(for_node);
+
         path.skip();
     }
 }
@@ -1730,7 +1853,7 @@ const push_to_push2 = {
         for (i = 0; i < reference.length; i++) {
             if (reference[i].parentPath.type === "CallExpression") {
                 if (chance(2)) {
-                    reference[i].parentPath.replaceWithSourceString("vm_stack[--vm_esp]");
+                    reference[i].parentPath.replaceWithSourceString("vm_stack[--vm_stack.$0]");
                 }
             }
         }
@@ -2002,7 +2125,7 @@ const replace_vm_call = {
                         );
                         reference[i].replaceWith(
                             type.memberExpression(
-                                type.identifier("vm_constant"),
+                                type.identifier("zcj"),
                                 type.stringLiteral(`_$${len}`), true
                             )
                         );
@@ -2013,17 +2136,26 @@ const replace_vm_call = {
 
 
         var for_ast = parse(
+            // "if(!('_$0' in constant)){\n" +
             "for (var i = 0; i < qa.length; i++) {\n" +
-            "    constant[\"_$\" + i] = qa[i].bind(constant).call.bind(qa[i].bind(constant));\n" +
+            "    zcj[\"_$\" + i] = qa[i].bind(constant).call.bind(qa[i].bind(constant));\n" +
             "}");
         var for_node;
         traverse(for_ast, {
-            ForStatement(p) {
+            'IfStatement|ForStatement'(p) {
                 for_node = p.node;
                 p.stop();
             }
         });
         block_body.unshift(for_node);
+        block_body.unshift(type.variableDeclaration(
+            "var", [
+                type.variableDeclarator(
+                    type.identifier("zcj"),
+                    type.arrayExpression([])
+                )
+            ]
+        ));
         block_body.unshift(
             type.variableDeclaration("var", [
                 type.variableDeclarator(type.identifier("qa"),
@@ -2034,7 +2166,7 @@ const replace_vm_call = {
         path.stop();
     }
 }
-
+/* opcode 回填 */
 const return_opcode = {
     MemberExpression(path) {
         var obj;
@@ -2077,32 +2209,54 @@ const noname = {
     }
 }
 
+const delete_code = {
+    Program(path) {
+        for (let i = 0; i < 6; i++) {
+            path.node.body.shift();
+        }
+    }
+}
 
 // var vm_code = fs.readFileSync("./vm_enter.js") + '';
-//
-// ast = parse(vm_code);
-// traverse(ast, noname);
-// traverse(ast, copy_block);
-// ast = parse(generator(ast).code);
-// traverse(ast, push_to_push2);
-// ast = parse(generator(ast).code);
-// traverse(ast, add_dead_code);
-// ast = parse(generator(ast).code);
-// traverse(ast, copy_vm_function);
-// ast = parse(generator(ast).code);
-// traverse(ast, replace_vm_function);
-// traverse(ast, return_opcode);
-//
-// /* 这里把vm方法复制 */
-// traverse(ast, junkCodeModule);
-// ast = parse(generator(ast).code);
-// traverse(ast, replace_call);
-// ast = parse(generator(ast).code);
-// traverse(ast, replace_vm_call);
-//
-//
-// var vmp_code = generator(ast).code;
-// fs.writeFileSync("./vmp.js", vmp_code);
+function new_vmp_code() {
+    var vm_code = fs.readFileSync("./new_vm_enter.js") + '';
+
+    ast = parse(vm_code);
+    // traverse(ast, noname);
+    traverse(ast, delete_code);
+    traverse(ast, copy_block);
+    ast = parse(generator(ast).code);
+
+    traverse(ast, push_to_push2);
+    ast = parse(generator(ast).code);
+    traverse(ast, add_dead_code);
+    ast = parse(generator(ast).code);
+    traverse(ast, copy_vm_function);
+    ast = parse(generator(ast).code);
+    traverse(ast, replace_vm_function);
+    traverse(ast, return_opcode);
+
+    // 有问题啊!!!!!!!!!!!!!!!
+    /* 这里把vm方法复制 */
+    traverse(ast, junkCodeModule);
+    ast = parse(generator(ast).code);
+    traverse(ast, replace_call);
+
+    // ast = parse(generator(ast).code);
+    // traverse(ast, replace_vm_call);
+
+    var vmp_code = generator(ast).code;
+    vmp_code = vmp_code.replace('fs.readFileSync("./opcode.txt") + \'\'', "'" + JSON.stringify(opcode) + "'");
+    const {obfuscate} = require('./vm_obfuscate.js');
+    vmp_code = obfuscate(vmp_code);
+    fs.writeFileSync("./vmp_out.js", vmp_code);
+
+}
+
+if (vmp_turn) {
+    new_vmp_code();
+}
+
 
 /* 以下都是废弃的 */
 
@@ -2134,8 +2288,7 @@ const fill_call_params = {
         }
     },
 }
-/* 函数重命名 */
-/* 巨慢,这个rename */
+/* 函数重命名 巨慢,这个rename*/
 const rename_function = {
     FunctionDeclaration(path) {
         if (!(path.node.id.name === "vm_enter")) return;
@@ -2153,5 +2306,6 @@ const rename_function = {
         }
     }
 }
+
 // traverse(ast, rename_function);
 

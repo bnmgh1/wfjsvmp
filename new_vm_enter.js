@@ -54,6 +54,7 @@ var OPCODE = {
     DELETE: 46,
     DEBUG: 47,
     FORIN: 48,
+    FINALLY: 49,
 
     RETURN: 88,
     IS_TRUE: 89,
@@ -106,7 +107,6 @@ var OPCODE1 = {
 
 (function (constant) {
     function vm_enter(opcode, index, constant, stack, esp, obj_arr) {
-
         function vm_opcodeToString(e, s) {
             var a = String["fromCharCode"], b = [];
             for (m = 0; m < e.length; m++) {
@@ -116,40 +116,41 @@ var OPCODE1 = {
         }
 
         function vm_push(e, s) {
-            return vm_stack[vm_stack.vm_esp++] = e, s;
+            return vm_stack[vm_stack.$0++] = e;
         }
 
         function vm_push_2(e, s) {
-            return vm_stack[vm_stack.vm_esp] = e, vm_stack.vm_esp++, s;
+            return vm_stack[vm_stack.$0] = e, vm_stack.$0++;
+        }
+
+        function vm_push_3(e, s) {
+            return vm_stack[vm_stack.$0] = e;
         }
 
         function vm_push_fake_3(e, s) {
-            return vm_stack[++vm_stack.vm_esp] = e, vm_stack.vm_esp--, s;
+            return vm_stack[++vm_stack.$0] = e, vm_stack.$0--;
         }
 
         function vm_push_fake_2(e, s) {
-            return s = vm_stack[vm_stack.vm_esp], vm_stack[vm_stack.vm_esp++] = s, vm_stack.vm_esp--, e;
+            return s = vm_stack[vm_stack.$0], vm_stack[vm_stack.$0++] = s, vm_stack.$0--;
         }
 
         function vm_push_fake_1(e, s) {
-            return vm_stack[vm_stack.vm_esp + 1] = e, s;
+            return vm_stack[vm_stack.$0 + 1] = e;
         }
 
         function vm_update_stack(e, s) {
-            return vm_stack.vm_esp++, s;
+            return vm_stack.$0++, s;
         }
 
         function vm_decrement_stack(e, s) {
-            return vm_stack.vm_esp--, s;
+            return vm_stack.$0--, s;
         }
 
         function vm_slice() {
             var result;
             // 字符串长度
             h = vm_get_opcode();
-            // result = opcode.slice(index, index + h).split("").map((opc) => {
-            //     return opc.charCodeAt() - 32
-            // });
             result = opcode.slice(index, index + h);
             // result = op_slice(this, index, index + h);
             index += h;
@@ -162,11 +163,11 @@ var OPCODE1 = {
         }
 
         function vm_get_value() {
-            return vm_stack[--vm_stack.vm_esp];
+            return vm_stack[--vm_stack.$0];
         }
 
         function vm_get_value_fake() {
-            return vm_stack[vm_stack.vm_esp - 1];
+            return vm_stack[vm_stack.$0 - 1];
         }
 
         function vm_get_opcode() {
@@ -189,7 +190,7 @@ var OPCODE1 = {
                     return void opNum1;
                 default:
                     // debugger;
-                    console.log("vmExpression_single_calc 没有这个 symbol =>", symbol);
+                    // console.log("vmExpression_single_calc 没有这个 symbol =>", symbol);
                     return undefined
             }
         }
@@ -265,61 +266,54 @@ var OPCODE1 = {
                 case "instanceof":
                     return opNum1 instanceof opNum2
                 default:
-                    console.log("vmExpression_calc 没有这个 symbol =>", symbol)
+                    // console.log("vmExpression_calc 没有这个 symbol =>", symbol)
                     return undefined
             }
         }
 
-        function vm_call(s, e, p, args, constant) {
+        function vm_call(s, e, p, z, args, constant) {
             var i;
-            if (!p_constant) var p_constant = {};
+            // if (!z.$4) z.$4 = {};
+            // var p_constant = z.$4;
+            var p_constant = {};
+            p_constant.__proto__ = constant, p_constant.$5 = args;
             for (i = 0; i < p.length; i++) {
                 p_constant[p[i]] = args[i];
             }
-            Object.setPrototypeOf(p_constant, constant);
-            p_constant["arguments"] = args;
+            // p_constant["arguments"] = args;
             // 通过args把需要的参数放到当前常量池中去,然后开始调用
             h = vm_enter.apply(this, [opcode.slice(s, e), 0, p_constant, [], 0, []]);
-            if (Array.isArray(h)){
+            if (Array.isArray(h)) {
                 h = h[1]
-            }
-            else return;
+            } else return;
             return h;
         }
 
-        var is_console = false;
         var vm_stack, h, y, d, g, m, cz, zc,
             hj, jk, lk, ik,
             vm_constant = constant, stack_splice, op_slice;
+        vm_stack = !stack ? [] : stack, vm_stack.$0 = esp, cz = [], zc = cz.splice, stack_splice = zc.bind(vm_stack).call.bind(zc.bind(vm_stack)), op_slice = zc.bind(opcode).call.bind(zc.bind(opcode));
 
-
-        for (var i in obj_arr) {
-            vm_constant[obj_arr[i]] = this["window"][obj_arr[i]];
+        for (ik in obj_arr) {
+            vm_constant[obj_arr[ik]] = this["window"][obj_arr[ik]];
         }
 
-        let get_key = (object, value) => {
-            return Object.keys(object).find(key => object[key] === value)
-        };
-
-        vm_stack = !stack ? [] : stack;
-        vm_stack.vm_esp = esp;
-        cz = [];
-        zc = cz.splice;
-        stack_splice = zc.bind(vm_stack).call.bind(zc.bind(vm_stack));
-        op_slice = zc.bind(opcode).call.bind(zc.bind(opcode));
+        // let get_key = (object, value) => {
+        //     return Object.keys(object).find(key => object[key] === value)
+        // };
 
         for (; ;) {
             // g = vm_get_opcode();
             g = opcode[index++];
-
             // console.log(g, "对应的指令 =>", get_key(OPCODE, g), " , 下一条指令 =>", opcode[index] , " index => " , index - 1);
+
             // if (!get_key(OPCODE, g)) {
             //     debugger
             // }
 
             // console.log(get_key(OPCODE, g));
-            // g = opcode[index++];
-            // if (vm_stack.vm_esp === -1) {
+
+            // if (vm_stack.$0 === -1) {
             //     console.log("堆栈索引都到-1了！！gg");
             //     debugger;
             // }
@@ -362,40 +356,35 @@ var OPCODE1 = {
                         vm_push(undefined);
                         // console.log(" 对象 => ", !!d && d.toString(), " key => ", y)
                         break;
-                    }
-                    if (d === vm_constant && !d.hasOwnProperty(y)) {
+                    } else if (d === vm_constant && !d.hasOwnProperty(y)) {
                         h = d.__proto__;
                         while (h != null) {
                             if (h.hasOwnProperty(y)) {
                                 d = h;
                                 break
-                            }
-                            h = h.__proto__;
+                            } else h = h.__proto__;
                         }
                     }
                     vm_push(d[y]);
-                    if (is_console) {
-                        console.log("push 对象 => ", d[y].toString(), "对象 => ", d.toString(), " key => ", y);
-                    }
                     break
                 case OPCODE.MOV_VAR:
-                    /* 变量池或者其他的 */
+                    /* value */
+                    y = vm_get_value();
+                    /* 对象 */
                     d = vm_get_value();
                     /* key */
-                    y = vm_get_value();
-                    if (d === vm_constant && !d.hasOwnProperty(y)) {
-                        h = d.__proto__;
-                        while (h != null) {
-                            if (h.hasOwnProperty(y)) {
-                                d = h;
+                    h = vm_get_value();
+                    if (d === vm_constant && !d.hasOwnProperty(h)) {
+                        m = d.__proto__;
+                        while (m != null) {
+                            if (m.hasOwnProperty(h)) {
+                                d = m;
                                 break
-                            }
-                            h = h.__proto__;
+                            } else m = m.__proto__;
                         }
                     }
-                    /* value */
-                    h = vm_get_value();
-                    d[y] = h;
+                    d[h] = y;
+                    vm_push_2(y);
                     break
                 case OPCODE.COMPUTE:
                     /* d是第二个 */
@@ -404,14 +393,16 @@ var OPCODE1 = {
                     y = vm_get_value();
                     /* symbol */
                     h = vm_get_value();
-                    vm_push(vmExpression_calc(h, d, y));
+                    m = vmExpression_calc(h, d, y);
+                    vm_push(m);
                     break
                 case OPCODE.SINGLE_COMPUTE:
                     /* 这里有二个值, 堆栈里的值,一个是标识符 */
                     d = vm_get_value();
                     /* symbol */
                     y = vm_get_value();
-                    vm_push(vmExpression_single_calc(y, d));
+                    h = vmExpression_single_calc(y, d)
+                    vm_push(h);
                     break
                 case OPCODE.UPDATE:
                     /* 这里有二个值, 对象, key 最后是标识符 */
@@ -421,14 +412,15 @@ var OPCODE1 = {
                     h = vm_get_value();
                     /* symbol */
                     y = vm_get_value();
-                    switch (y) {
-                        case "++":
-                            d[h]++;
-                            break
-                        case "--":
-                            d[h]--;
-                            break
-                    }
+                    // switch (y) {
+                    //     case "++":
+                    //         d[h]++;
+                    //         break
+                    //     case "--":
+                    //         d[h]--;
+                    //         break
+                    // }
+                    y == "++" ? d[h]++ : "--" == y && d[h]--;
                     break
                 case OPCODE.NEW_ARRAY:
                     /* new 一个 array 后面跟的是初始化的对象个数 */
@@ -437,23 +429,23 @@ var OPCODE1 = {
                     // for (var i = 0; i < y; i++) {
                     //     d[y - i - 1] = vm_get_value();
                     // }
-                    d = vm_stack_slice(vm_stack.vm_esp - y, y);
-                    vm_stack.vm_esp = vm_stack.vm_esp - y;
+                    d = vm_stack_slice(vm_stack.$0 - y, y);
+                    vm_stack.$0 = vm_stack.$0 - y;
                     vm_push(d);
+                    break
+                case OPCODE.DELETE:
+                    d = vm_get_value();
+                    h = vm_get_value();
+                    // delete h[d];
+                    delete d[h];
                     break
                 case OPCODE.GET_OBJ:
                     /* 对象, key, 将值压入堆栈 */
                     y = vm_get_value();
                     d = vm_get_value();
+                    // h = d[y];
                     h = y[d];
                     // h = vm_get_value()[vm_get_value()];
-                    if (is_console) {
-                        try {
-                            console.log("GET_OBJ => ", d[y].toString(), "对象 => ", d.toString(), " key => ", y);
-                        } catch (e) {
-                            // debugger;
-                        }
-                    }
                     vm_push(h);
 
                     break;
@@ -462,25 +454,27 @@ var OPCODE1 = {
                     y = vm_get_value();
                     d = vm_get_value();
                     h = vm_get_value();
-                    y[d] = h;
-
-                    // if (is_console) {
-                    //     console.log("SET_OBJ => ", d[y].toString(), "对象 => ", d.toString(), " key => ", y);
-                    // }
-
+                    // h[d] = y;
+                    d[h] = y;
+                    vm_push_2(y);
                     /* 这样更具迷惑性 */
                     // vm_get_value()[vm_get_value()] = vm_get_value();
                     break
                 case OPCODE.NEW_OBJECT:
                     y = {};
                     d = vm_get_opcode();
-
-                    for (var i = 0; i < d; i++) {
-                        m = vm_get_value();
-                        h = vm_get_value();
-                        y[h] = m;
-                    }
-                    vm_stack_slice(vm_stack.vm_esp, vm_stack.length - 1);
+                    // for (ik = 0; ik < d; ik++) {
+                    //     m = vm_get_value();
+                    //     h = vm_get_value();
+                    //     y[h] = m;
+                    // }
+                    zc = (zc = new Array(d)).fill(1);
+                    cz = zc.map(it => {
+                        m = vm_get_value(), h = vm_get_value(), y[h] = m, it
+                    });
+                    d = vm_stack.$0;
+                    vm_stack_slice(vm_stack.$0, vm_stack.length - 1);
+                    vm_stack.$0 = d;
                     vm_push(y);
                     break
                 case OPCODE.APPLY:
@@ -492,51 +486,46 @@ var OPCODE1 = {
                     /* 传参 */
                     d = vm_get_value();
 
-                    if (h === undefined) {
-                        debugger
-                        break
-                    }
-                    if (!!h.aaa) {
-                        /* 这里this还没判断啊~ 很烦 */
-                        d = h.apply(y, d);
-                    } else {
-                        /*  方法  */
-                        if (h.name === "toString") {
-                            /* toString(16) */
-                            if (d.length > 1) {
-                                console.log("toString 传参超过2个 ~~");
-                            } else {
-                                d = y.toString(d[0]);
-                            }
+                    // if (h === undefined) {
+                    //     vm_push_fake_2(d);
+                    // } else if (h.hasOwnProperty("$0")) {
+                    //     /* 这里this还没判断啊~ 很烦 */
+                    //     d = h.apply(y, d);
+                    //     /* 方法调用管你要不要值,我都直接push到堆栈里呢 */
+                    //     vm_push(d);
+                    // } else {
+                    //     /*  方法  */
+                    //     // if (h.name === "toString") {
+                    //     //     /* toString(16) */
+                    //     //     d = y.toString(d[0]);
+                    //     // } else {
+                    //     //     d = h.apply(y, d);
+                    //     // }
+                    //     // vm_push(d);
+                    //     /* 方法调用管你要不要值,我都直接push到堆栈里呢 */
+                    //
+                    // }
 
-                        } else if (h === undefined) {
-                            /* 调用者为空 有bug 有bug */
-                            // console.log("调用者为空 有bug!!!")
-                            // debugger;
-                            break;
-                        } else {
-                            d = h.apply(y, d);
-                        }
-                    }
-                    /* 方法调用管你要不要值,我都直接push到堆栈里呢 */
-                    vm_push(d);
+                    h === void 0 ? vm_push_fake_2(d) : h.hasOwnProperty("$0") ? (d = h.apply(y, d), vm_push(d)) :
+                        (h.name === "toString" ? d = y.toString(d[0]) : d = h.apply(y, d), vm_push(d));
                     break
                 case OPCODE.NEW_FUNC:
                     y = vm_get_opcode();
                     d = index;
                     index += y;
-                    vm_push(function () {
-                        return zzz.aaa = d,
-                            zzz.bbb = index,
-                            zzz.ccc = vm_stack[--vm_stack.vm_esp],
-                            zzz;
+                    m = (function () {
+                        return zzz;
 
                         function zzz() {
-                            h = vm_call.apply(this, [zzz.aaa, zzz.bbb, zzz.ccc, arguments, vm_constant]);
+                            var f = arguments;
+                            h = vm_call.apply(this, [zzz.$1, zzz.$2, zzz.$3, zzz, f, vm_constant]);
                             return h;
                         }
                     }
-                    ());
+                    ()), m.$1 = d,
+                        m.$2 = index,
+                        m.$3 = vm_stack[--vm_stack.$0],
+                        vm_push(m);
                     break
                 case OPCODE.IS_TRUE:
                     y = vm_get_value();
@@ -558,21 +547,10 @@ var OPCODE1 = {
                 case OPCODE.NEW_CONSTRUCT:
                     /* 传参 */
                     d = vm_get_value();
-
                     /* 调用者/自定义方法 */
                     y = vm_get_value();
-
                     h = new y(...d);
-
                     vm_push(h);
-
-                    // try {
-                    //     vm_push(new y(...d));
-                    // } catch (e) {
-                    //     console.log("new 出霸哥~");
-                    //     debugger;
-                    //     // throw "new 出霸哥~"
-                    // }
                     break
                 case OPCODE.BREAK:
                     y = vm_get_opcode();
@@ -611,7 +589,7 @@ var OPCODE1 = {
                         /* try opcode */
                         y = vm_slice();
                         d += y.length + 1;
-                        h = vm_enter.apply(this, [y, 0, vm_constant, vm_stack, vm_stack.vm_esp, []]);
+                        h = vm_enter.apply(this, [y, 0, vm_constant, vm_stack, vm_stack.$0, []]);
                         if (Array.isArray(h)) {
                             d = h[0] , y = h[1];
                             /* 这里多了2 try + slice 导致的index+2 */
@@ -630,50 +608,114 @@ var OPCODE1 = {
                                         return [OPCODE.CONTINUE, y];
                                     }
                                     break
-                                default:
-                                    // console.log("try 非BREAK CONTINUE 指令返回 => return ", h);
+                                case 0:
                                     return h;
-
+                                default:
+                                    console.log("try 非BREAK CONTINUE RETURN 指令返回 => return ", h);
                             }
                         }
                     } catch (e) {
-                        vm_push(e);
                         index = d + 2;
+                        m = vm_slice();
+                        /* push e对象 */
+                        vm_enter.apply(this, [m, 0, vm_constant, vm_stack, vm_stack.$0, []]);
+                        vm_push(e);
+                        m = vm_slice();
+                        h = vm_enter.apply(this, [m, 0, vm_constant, vm_stack, vm_stack.$0, []]);
+                        if (Array.isArray(h)) {
+                            d = h[0] , y = h[1];
+                            /* 这里多了2 try + slice 导致的index+2 */
+                            switch (d) {
+                                case OPCODE.BREAK:
+                                    index += y;
+                                    if (index > opcode.length) {
+                                        // console.log("try break 超出当前opcode字节码数组长度~ return 上一层");
+                                        return [OPCODE.BREAK, y];
+                                    }
+                                    break
+                                case OPCODE.CONTINUE:
+                                    index -= y;
+                                    if (index < 0 || index > opcode.length) {
+                                        // console.log("try continue 超出当前opcode字节码数组长度~ return 上一层");
+                                        return [OPCODE.CONTINUE, y];
+                                    }
+                                    break
+                                case 0:
+                                    return h;
+                                default:
+                                    console.log("try 非BREAK CONTINUE RETURN 指令返回 => return ", h);
+                            }
+                        }
+                    } finally {
+                        y = vm_get_opcode();
+                        /* 没走到catch */
+                        if (y === OPCODE.SKIP_BLOCK) {
+                            y = vm_get_opcode();
+                            index += y;
+                            y = vm_get_opcode();
+                        }
+                        if (y === OPCODE.FINALLY) {
+                            m = vm_slice();
+                            h = vm_enter.apply(this, [m, 0, vm_constant, vm_stack, vm_stack.$0, []]);
+                            if (Array.isArray(h)) {
+                                d = h[0] , y = h[1];
+                                /* 这里多了2 try + slice 导致的index+2 */
+                                switch (d) {
+                                    case OPCODE.BREAK:
+                                        index += y;
+                                        if (index > opcode.length) {
+                                            // console.log("try break 超出当前opcode字节码数组长度~ return 上一层");
+                                            return [OPCODE.BREAK, y];
+                                        }
+                                        break
+                                    case OPCODE.CONTINUE:
+                                        index -= y;
+                                        if (index < 0 || index > opcode.length) {
+                                            // console.log("try continue 超出当前opcode字节码数组长度~ return 上一层");
+                                            return [OPCODE.CONTINUE, y];
+                                        }
+                                        break
+                                    case 0:
+                                        return h;
+                                    default:
+                                        console.log("try 非BREAK CONTINUE RETURN 指令返回 => return ", h);
+                                }
+                            }
+                        } else index--;
                     }
                     break
                 case OPCODE.FORIN:
                     d = vm_get_value();
+                    lk = vm_get_value();
+                    ik = vm_get_value();
                     zc = vm_slice();
                     for (cz in d) {
+                        vm_push_2(ik);
+                        vm_push(lk);
                         vm_push_2(cz);
-                        h = vm_enter.apply(this, [zc, 0, vm_constant, vm_stack, vm_stack.vm_esp, []]);
+                        h = vm_enter.apply(this, [zc, 0, vm_constant, vm_stack, vm_stack.$0, []]);
                         if (Array.isArray(h)) {
                             m = h[0] , y = h[1];
-                            /* 这里多了2 try + slice 导致的index+2 */
                             switch (m) {
                                 case OPCODE.BREAK:
                                     break
                                 case OPCODE.CONTINUE:
                                     continue;
-                                default:
-                                    console.log("try 非BREAK CONTINUE 指令返回 => return ", h);
+                                case 0:
                                     return h;
+                                default:
+                                    console.log("try 非BREAK CONTINUE RETURN 指令返回 => ", h);
+                                // return h;
                             }
                         }
                     }
                     break
                 case OPCODE.UPDATE_STACK:
                     /* 把之前的值拿下来 */
-                    vm_stack.vm_esp++;
+                    vm_stack.$0++;
                     break
                 case OPCODE.DECREMENT_STACK:
-                    vm_stack.vm_esp--;
-                    break
-                case OPCODE.DELETE:
-                    d = vm_get_value();
-                    h = vm_get_value();
-                    delete h[d];
-                    // delete h[d];
+                    vm_stack.$0--;
                     break
                 case OPCODE.RETURN:
                     y = vm_get_value();
@@ -940,16 +982,11 @@ var OPCODE1 = {
                     debugger;
             }
         }
-
     }
 
-    var opcode = eval(fs.readFileSync("./opcode.txt") + '')
+    var opcode = eval(fs.readFileSync("./opcode.txt") + '');
     /* collect 存放for循环test 后 IS_TRUE的索引 */
     vm_enter(opcode, 0, constant, void 0, 0, ['window']);
-}).apply(window, [constant = {"$_jsvmp": true}])
-
-
-// console.log(window.md5(''))
-
+}).apply(window, [constant = {"$_jsvmp": true}]);
 
 

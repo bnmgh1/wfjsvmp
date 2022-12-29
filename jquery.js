@@ -83,7 +83,6 @@
 
         // Used by jQuery.camelCase as callback to replace()
         fcamelCase = function (all, letter) {
-        console.log('fcamelCase call => ')
             return letter.toUpperCase();
         };
 
@@ -134,6 +133,7 @@
         // (You can seed the arguments with an array of args, but this is
         // only used internally.)
         each: function (callback, args) {
+            console.log("setTimeout each => ");
             return jQuery.each(this, callback, args);
         },
 
@@ -192,7 +192,7 @@
         // Handle case when target is a string or something (possible in deep copy)
         // console.log(typeof target !== "object")
         // console.log(!jQuery.isFunction(target))
-        // console.log(typeof target !== "object" && !jQuery.isFunction(target))
+        console.log("typeof target !== \"object\" && !jQuery.isFunction(target) => ", typeof target !== "object" && !jQuery.isFunction(target))
         if (typeof target !== "object" && !jQuery.isFunction(target)) {
             target = {};
         }
@@ -201,7 +201,7 @@
         if (i === length) {
             target = this;
             // target = jQuery;
-            // console.log("target => ",target);
+            console.log("target = this => ", target);
             i--;
         }
 
@@ -214,13 +214,14 @@
                     src = target[name];
                     copy = options[name];
                     // Prevent never-ending loop
-                    console.log(target === copy);
+                    console.log("target === copy => name => ", target === copy, name);
                     if (target === copy) {
                         continue;
                     }
                     // console.log("jQuery.isPlainObject is call  => ");
                     // Recurse if we're merging plain objects or arrays
                     // console.log("jQuery.isPlainObject is call => ", "deep", deep, jQuery.isPlainObject, "copyIsArray => ", copyIsArray);
+                    console.log("deep && copy && =>", deep && copy, deep && copy && jQuery.isPlainObject(copy));
                     if (deep && copy && (jQuery.isPlainObject(copy) || (copyIsArray = jQuery.isArray(copy)))) {
                         if (copyIsArray) {
                             console.log("copyIsArray =>", copyIsArray.toString());
@@ -228,23 +229,23 @@
                             clone = src && jQuery.isArray(src) ? src : [];
 
                         } else {
-
                             clone = src && jQuery.isPlainObject(src) ? src : {};
-                            console.log("clone =>", clone.toString());
+                            console.log("clone =>", clone);
                         }
-                        console.log("target[name] =>");
+                        console.log("deep =>", deep, ", clone =>", clone, " , copy => ", copy);
                         // Never move original objects, clone them
                         target[name] = jQuery.extend(deep, clone, copy);
 
                         // Don't bring in undefined values
                     } else if (copy !== undefined) {
-                        // console.log(target[name]);
+                        console.log("target[name] call ", name);
                         target[name] = copy;
+                        // console.log("target[name] call after ", copy);
                     }
                 }
             }
         }
-        console.log("return target");
+        console.log("return target => ", target);
         // Return the modified object
         return target;
     };
@@ -307,9 +308,14 @@
 
             try {
                 // Not own constructor property must be Object
+                console.log("obj.constructor =>", obj.constructor);
+                console.log("!hasOwn.call(obj, \"constructor\") =>", !hasOwn.call(obj, "constructor"));
+                console.log("!hasOwn.call(obj.constructor.prototype, \"isPrototypeOf\") =>", !hasOwn.call(obj.constructor.prototype, "isPrototypeOf"));
+
                 if (obj.constructor &&
                     !hasOwn.call(obj, "constructor") &&
                     !hasOwn.call(obj.constructor.prototype, "isPrototypeOf")) {
+                    console.log("return false");
                     return false;
                 }
             } catch (e) {
@@ -329,8 +335,9 @@
             // if last one is own, then all properties are own.
             for (key in obj) {
             }
-
-            return key === undefined || hasOwn.call(obj, key);
+            var result = key === undefined || hasOwn.call(obj, key);
+            console.log("isPlainObject result => ", result);
+            return result;
         },
 
         type: function (obj) {
@@ -371,13 +378,13 @@
 
         // args is for internal usage only
         each: function (obj, callback, args) {
-            console.log("var value, => ")
+            // console.log("var value, => ")
             var value,
                 i = 0,
                 length = obj.length;
-            console.log("length = obj.length, length => ", length);
+            // console.log("length = obj.length, length => ", length);
             var isArray = isArraylike(obj);
-            console.log("isArray", length)
+            // console.log("isArray", length)
             if (args) {
                 if (isArray) {
                     for (; i < length; i++) {
@@ -409,7 +416,7 @@
                         }
                     }
                 } else {
-                    console.log("i in obj call");
+                    // console.log("i in obj call");
                     for (i in obj) {
                         value = callback.call(obj[i], i, obj[i]);
 
@@ -584,7 +591,7 @@
         // properties to it so it needs to exist.
         support: support
     });
-    console.log("jQuery.each call");
+    // console.log("jQuery.each call");
 // Populate the class2type map
 //     console.log(jQuery.each);
     jQuery.each("Boolean Number String Function Array Date RegExp Object Error".split(" "), function (i, name) {
@@ -612,7 +619,7 @@
             typeof length === "number" && length > 0 && (length - 1) in obj;
     }
 
-    console.log("var Sizzle call");
+    // console.log("var Sizzle call");
     var Sizzle =
         /*!
  * Sizzle CSS Selector Engine v2.2.0-pre
@@ -782,7 +789,7 @@
                 };
 
 // Optimize for push.apply( _, NodeList )
-            console.log("try call = > 2634");
+//             console.log("try call = > 2634");
             try {
                 push.apply(
                     (arr = slice.call(preferredDoc.childNodes)),
@@ -956,15 +963,18 @@
              * @param {Function} fn Passed the created div and expects a boolean result
              */
             function assert(fn) {
+                console.log("assert document => ", document);
                 var div = document.createElement("div");
                 try {
-                    console.log("assert => call ", div);
+                    // console.log("assert => call ", div);
                     return !!fn(div);
                 } catch (e) {
                     return false;
                 } finally {
+                    console.log("div.parentNode finally ", div.parentNode);
                     // Remove from its parent by default
                     if (div.parentNode) {
+                        console.log("finally div.parentNode.removeChild(div);");
                         div.parentNode.removeChild(div);
                     }
                     // release memory in IE
@@ -1068,6 +1078,7 @@
                 return context && typeof context.getElementsByTagName !== "undefined" && context;
             }
 
+            console.log("Sizzle => ", Sizzle);
 // Expose support vars for convenience
             support = Sizzle.support = {};
 
@@ -1091,7 +1102,6 @@
             setDocument = Sizzle.setDocument = function (node) {
                 var hasCompare, parent,
                     doc = node ? node.ownerDocument || node : preferredDoc;
-
                 // If no document and documentElement is available, return
                 if (doc === document || doc.nodeType !== 9 || !doc.documentElement) {
                     return document;
@@ -1101,6 +1111,8 @@
                 document = doc;
                 docElem = doc.documentElement;
                 parent = doc.defaultView;
+
+                console.log("document => ", document);
 
                 // Support: IE>8
                 // If iframe document is assigned to "document" variable and if iframe has been reloaded,
@@ -1121,7 +1133,7 @@
 
                 /* Attributes
 	---------------------------------------------------------------------- */
-
+                console.log("support.attributes = assert call", document);
                 // Support: IE<8
                 // Verify that getAttribute really returns attributes and not properties
                 // (excepting IE8 booleans)
@@ -1132,7 +1144,7 @@
 
                 /* getElement(s)By*
 	---------------------------------------------------------------------- */
-
+                console.log("support.getElementsByTagName = assert call");
                 // Check if getElementsByTagName("*") returns only elements
                 support.getElementsByTagName = assert(function (div) {
                     div.appendChild(doc.createComment(""));
@@ -1147,7 +1159,7 @@
                 // The broken getElementById methods don't pick up programatically-set names,
                 // so use a roundabout getElementsByName test
                 support.getById = assert(function (div) {
-                    console.log("support.getById div => ", div);
+                    // console.log("support.getById div => ", div);
                     docElem.appendChild(div).id = expando;
                     return !doc.getElementsByName || !doc.getElementsByName(expando).length;
                 });
@@ -1235,8 +1247,10 @@
                 // So, we allow :focus to pass through QSA all the time to avoid the IE error
                 // See http://bugs.jquery.com/ticket/13378
                 rbuggyQSA = [];
-                console.log("判断 => ", support.qsa = rnative.test(doc.querySelectorAll))
+                console.log("(support.qsa = rnative.test(doc.querySelectorAll)) call ");
+                // console.log("判断 => ", support.qsa = rnative.test(doc.querySelectorAll))
                 if ((support.qsa = rnative.test(doc.querySelectorAll))) {
+                    console.log("if ((support.qsa = rnative.test(doc.querySelectorAll))) { enter");
                     // Build QSA regex
                     // Regex strategy adopted from Diego Perini
                     assert(function (div) {
@@ -1282,7 +1296,7 @@
                             rbuggyQSA.push(".#.+[+~]");
                         }
                     });
-
+                    console.log("assert(function (div) {  doc =>", doc);
                     assert(function (div) {
                         // Support: Windows 8 Native Apps
                         // The type and name attributes are restricted during .innerHTML assignment
@@ -2067,7 +2081,7 @@
             };
 
             Expr.pseudos["nth"] = Expr.pseudos["eq"];
-            console.log("Expr.pseudos[\"nth\"] = Expr.pseudos[\"eq\"]; call ");
+            // console.log("Expr.pseudos[\"nth\"] = Expr.pseudos[\"eq\"]; call ");
 
 // Add button/input type pseudos
             for (i in {radio: true, checkbox: true, file: true, password: true, image: true}) {
@@ -2082,14 +2096,14 @@
             }
 
             setFilters.prototype = Expr.filters = Expr.pseudos;
-            console.log("Expr.setFilters = new setFilters() before call");
+            // console.log("Expr.setFilters = new setFilters() before call");
             Expr.setFilters = new setFilters();
-            console.log("Expr.setFilters = new setFilters() after call");
+            // console.log("Expr.setFilters = new setFilters() after call");
             tokenize = Sizzle.tokenize = function (selector, parseOnly) {
                 var matched, match, tokens, type,
                     soFar, groups, preFilters,
                     cached = tokenCache[selector + " "];
-
+                // console.log("tokenize = Sizzle.tokenize enter");
                 if (cached) {
                     return parseOnly ? 0 : cached.slice(0);
                 }
@@ -2102,6 +2116,7 @@
 
                     // Comma and first run
                     if (!matched || (match = rcomma.exec(soFar))) {
+                        // console.log("matched -> ", matched);
                         if (match) {
                             // Don't consume trailing commas as valid
                             soFar = soFar.slice(match[0].length) || soFar;
@@ -2113,6 +2128,7 @@
 
                     // Combinators
                     if ((match = rcombinators.exec(soFar))) {
+                        // console.log("matched -> ", matched);
                         matched = match.shift();
                         tokens.push({
                             value: matched,
@@ -2151,6 +2167,8 @@
                         // Cache the tokens
                         tokenCache(selector, groups).slice(0);
             };
+
+            // console.log("tokenize = Sizzle.tokenize call");
 
             function toSelector(tokens) {
                 var i = 0,
@@ -2621,6 +2639,7 @@
 // One-time assignments
 
 // Sort stability
+//             console.log("support.sortStable call");
             support.sortStable = expando.split("").sort(sortOrder).join("") === expando;
 
 // Support: Chrome 14-35+
@@ -2686,7 +2705,7 @@
             return Sizzle;
 
         })(window);
-    console.log("var Sizzle call after");
+    // console.log("var Sizzle call after");
 
     jQuery.find = Sizzle;
     jQuery.expr = Sizzle.selectors;
@@ -2799,28 +2818,27 @@
 
 
 // A central reference to the root jQuery(document)
+//     console.log("init 赋值 => ");
     var rootjQuery,
 
         // Use the correct document accordingly with window argument (sandbox)
         document = window.document,
-
         // A simple way to check for HTML strings
         // Prioritize #id over <tag> to avoid XSS via location.hash (#9521)
         // Strict HTML recognition (#11290: must start with <)
         rquickExpr = /^(?:\s*(<[\w\W]+>)[^>]*|#([\w-]*))$/,
-
         init = jQuery.fn.init = function (selector, context) {
-            console.log("init enter");
+            // console.log("init enter");
             var match, elem;
 
             // HANDLE: $(""), $(null), $(undefined), $(false)
-            console.log("!selector => ", !selector);
+            // console.log("!selector => ", !selector);
             if (!selector) {
                 return this;
             }
-            console.log("typeof selector === \"string\" => ", typeof selector === "string");
-            console.log("selector.nodeType =>",selector.nodeType);
-            console.log("jQuery.isFunction(selector) = >",jQuery.isFunction(selector));
+            // console.log("typeof selector === \"string\" => ", typeof selector === "string");
+            // console.log("selector.nodeType =>", selector.nodeType);
+            // console.log("jQuery.isFunction(selector) = >", jQuery.isFunction(selector));
 
             // Handle HTML strings
             if (typeof selector === "string") {
@@ -2900,13 +2918,13 @@
             } else if (selector.nodeType) {
                 this.context = this[0] = selector;
                 this.length = 1;
+                // console.log("selector.nodeType return => ", this);
                 return this;
 
                 // HANDLE: $(function)
                 // Shortcut for document ready
             } else if (jQuery.isFunction(selector)) {
-                console.log("typeof rootjQuery.ready call => ");
-                console.log(typeof rootjQuery.ready !== "undefined");
+                // console.log("typeof rootjQuery.ready call => ", rootjQuery.ready)
                 return typeof rootjQuery.ready !== "undefined" ?
                     rootjQuery.ready(selector) :
                     // Execute immediately if ready is not present
@@ -2917,16 +2935,17 @@
                 this.selector = selector.selector;
                 this.context = selector.context;
             }
-
             return jQuery.makeArray(selector, this);
         };
 
 // Give the init function the jQuery prototype for later instantiation
     init.prototype = jQuery.fn;
-
+    console.log("init  => ", init);
+    console.log("jQuery.fn.init  => ", jQuery.fn.init);
 // Initialize central reference
     rootjQuery = jQuery(document);
 
+    // console.log("rootjQuery after call");
 
     var rparentsprev = /^(?:parents|prev(?:Until|All))/,
         // methods guaranteed to produce a unique set when starting from a unique set
@@ -3125,14 +3144,14 @@
 
 // Convert String-formatted options into Object-formatted ones and store in cache
     function createOptions(options) {
-        console.log("options => ", options);
+        // console.log("options => ", options);
         var object = optionsCache[options] = {};
 
         jQuery.each(options.match(rnotwhite) || [], function (_, flag) {
             object[flag] = true;
         });
 
-        console.log("jQuery.each => options => ", options);
+        // console.log("jQuery.each => options => ", options);
         return object;
     }
 
@@ -3163,12 +3182,12 @@
 
         // Convert options from String-formatted to Object-formatted if needed
         // (we check in cache first)
-        console.log("optionsCache[options] => ",optionsCache[options]);
-        console.log("createOptions(options) => ", createOptions(options));
+        // console.log("optionsCache[options] => ", optionsCache[options]);
+        // console.log("createOptions(options) => ", createOptions(options));
         options = typeof options === "string" ?
             (optionsCache[options] || createOptions(options)) :
             jQuery.extend({}, options);
-         console.log("jQuery.Callbacks options after => !options.once,",!options.once , options);
+        // console.log("jQuery.Callbacks options after => !options.once,", !options.once, options);
 
         var // Flag to know if list is currently firing
             firing,
@@ -3222,6 +3241,7 @@
                         var start = list.length;
                         (function add(args) {
                             jQuery.each(args, function (_, arg) {
+                                // console.log("jQuery.each(args, function (_, arg) callback => ", _, arg);
                                 var type = jQuery.type(arg);
                                 if (type === "function") {
                                     if (!options.unique || !self.has(arg)) {
@@ -3229,6 +3249,7 @@
                                     }
                                 } else if (arg && arg.length && type !== "string") {
                                     // Inspect recursively
+                                    // console.log("arg && arg.length , arg => ", arg)
                                     add(arg);
                                 }
                             });
@@ -3322,7 +3343,7 @@
                     return !!fired;
                 }
             };
-        console.log("return self  => ");
+        // console.log("return self  => ");
         return self;
     };
 
@@ -3331,14 +3352,14 @@
     jQuery.extend({
 
         Deferred: function (func) {
-            console.log("tuples before =>");
+            // console.log("tuples before =>");
             var tuples = [
-                    // action, add listener, listener list, final state
-                    ["resolve", "done", jQuery.Callbacks("once memory"), "resolved"],
-                    ["reject", "fail", jQuery.Callbacks("once memory"), "rejected"],
-                    ["notify", "progress", jQuery.Callbacks("memory")
-                    ]
-                ];
+                // action, add listener, listener list, final state
+                ["resolve", "done", jQuery.Callbacks("once memory"), "resolved"],
+                ["reject", "fail", jQuery.Callbacks("once memory"), "rejected"],
+                ["notify", "progress", jQuery.Callbacks("memory")
+                ]
+            ];
             // var tuples = [
             //         // action, add listener, listener list, final state
             //         ["resolve", "done", ["once", "memory"], "resolved"],
@@ -3346,9 +3367,9 @@
             //         ["notify", "progress", ["memory"]
             //         ]
             //     ];
-            console.log("tuples =>",tuples);
+            console.log("tuples =>", tuples);
 
-                var state = "pending",
+            var state = "pending",
                 promise = {
                     state: function () {
                         return state;
@@ -3487,6 +3508,7 @@
 
     jQuery.fn.ready = function (fn) {
         // Add the callback
+        console.log("jQuery.ready.promise().done(fn); => call ");
         jQuery.ready.promise().done(fn);
 
         return this;
@@ -3511,12 +3533,12 @@
 
         // Handle when the DOM is ready
         ready: function (wait) {
-
+            // console.log("jQuery ready enter =>");
             // Abort if there are pending holds or we're already ready
             if (wait === true ? --jQuery.readyWait : jQuery.isReady) {
                 return;
             }
-
+            // console.log("jQuery ready enter => !document.body ,", !document.body);
             // Make sure body exists, at least, in case IE gets a little overzealous (ticket #5443).
             if (!document.body) {
                 return setTimeout(jQuery.ready);
@@ -3525,16 +3547,19 @@
             // Remember that the DOM is ready
             jQuery.isReady = true;
 
+            // console.log("wait !== true =>", wait !== true);
+            // console.log("--jQuery.readyWait =>", jQuery.readyWait - 1 > 0);
             // If a normal DOM Ready event fired, decrement, and wait if need be
             if (wait !== true && --jQuery.readyWait > 0) {
                 return;
             }
-
+            // console.log("jQuery ready enter => wait !== true && --jQuery.readyWait > 0  after");
             // If there are functions bound, to execute
             readyList.resolveWith(document, [jQuery]);
 
             // Trigger any bound ready events
             if (jQuery.fn.triggerHandler) {
+                // console.log("jQuery.fn.triggerHandler enter =>");
                 jQuery(document).triggerHandler("ready");
                 jQuery(document).off("ready");
             }
@@ -3567,15 +3592,19 @@
     }
 
     jQuery.ready.promise = function (obj) {
+        console.log("jQuery.ready.promise enter => ");
         if (!readyList) {
-
+            // console.log("readyList = jQuery.Deferred(); => ");
             readyList = jQuery.Deferred();
 
             // Catch cases where $(document).ready() is called after the browser event has already occurred.
             // we once tried to use readyState "interactive" here, but it caused issues like the one
             // discovered by ChrisS here: http://bugs.jquery.com/ticket/12282#comment:15
+            // console.log("document.readyState === \"complete\" => ", document.readyState);
+            console.log("document.readyState === \"complete\" => ", document.readyState, document.readyState === "complete");
+            document.readyState = "complete";
             if (document.readyState === "complete") {
-                console.log("setTimeout(jQuery.ready) call => ");
+                console.log("setTimeout(jQuery.ready) call => ", jQuery.ready);
                 // Handle it asynchronously to allow scripts the opportunity to delay ready
                 setTimeout(jQuery.ready);
 
@@ -3705,6 +3734,7 @@
      * Determines whether an object can have data
      */
     jQuery.acceptData = function (elem) {
+        console.log("var noData => ", elem);
         var noData = jQuery.noData[(elem.nodeName + " ").toLowerCase()],
             nodeType = +elem.nodeType || 1;
 
@@ -4557,9 +4587,9 @@
                 eventPath = [elem || document],
                 type = hasOwn.call(event, "type") ? event.type : event,
                 namespaces = hasOwn.call(event, "namespace") ? event.namespace.split(".") : [];
-
+            // console.log("eventPath call after !");
             cur = tmp = elem = elem || document;
-
+            // console.log("trigger enter elem =>", elem);
             // Don't do events on text and comment nodes
             if (elem.nodeType === 3 || elem.nodeType === 8) {
                 return;
@@ -4577,12 +4607,12 @@
                 namespaces.sort();
             }
             ontype = type.indexOf(":") < 0 && "on" + type;
-
+            // console.log("event = event[jQuery.expando] ? before");
             // Caller can pass in a jQuery.Event object, Object, or just an event type string
             event = event[jQuery.expando] ?
                 event :
                 new jQuery.Event(type, typeof event === "object" && event);
-
+            // console.log("event = event[jQuery.expando] ? after");
             // Trigger bitmask: & 1 for native handlers; & 2 for jQuery (always true)
             event.isTrigger = onlyHandlers ? 2 : 3;
             event.namespace = namespaces.join(".");
@@ -4606,7 +4636,7 @@
             if (!onlyHandlers && special.trigger && special.trigger.apply(elem, data) === false) {
                 return;
             }
-
+            // console.log("!onlyHandlers && !special.noBubble && !jQuery.isWindow(elem) call elem =>", elem);
             // Determine event propagation path in advance, per W3C events spec (#9951)
             // Bubble up to document, then to window; watch for a global ownerDocument var (#9724)
             if (!onlyHandlers && !special.noBubble && !jQuery.isWindow(elem)) {
@@ -4619,15 +4649,16 @@
                     eventPath.push(cur);
                     tmp = cur;
                 }
-
+                // console.log("tmp === (elem.ownerDocument || document) => ", tmp === (elem.ownerDocument || document));
                 // Only add window if we got to document (e.g., not plain obj or detached DOM)
                 if (tmp === (elem.ownerDocument || document)) {
                     eventPath.push(tmp.defaultView || tmp.parentWindow || window);
                 }
             }
-
+            // debugger;
             // Fire handlers on the event path
             i = 0;
+            // console.log(" while ((cur = eventPath[i++]) before ");
             while ((cur = eventPath[i++]) && !event.isPropagationStopped()) {
 
                 event.type = i > 1 ?
@@ -4650,7 +4681,7 @@
                 }
             }
             event.type = type;
-
+            // console.log("onlyHandlers && !event.isDefaultPrevented() call  elem => ", elem);
             // If nobody prevented the default action, do it now
             if (!onlyHandlers && !event.isDefaultPrevented()) {
 
@@ -5314,6 +5345,7 @@
             return this.on(types, selector, data, fn, 1);
         },
         off: function (types, selector, fn) {
+            console.log("enter off => ");
             var handleObj, type;
             if (types && types.preventDefault && types.handleObj) {
                 // ( event )  dispatched jQuery.Event
@@ -6997,7 +7029,7 @@
     Tween.prototype = {
         constructor: Tween,
         init: function (elem, options, prop, end, easing, unit) {
-            console.log("Tween.prototype = { options => " ,options)
+            console.log("Tween.prototype = { options => ", options)
             this.elem = elem;
             this.prop = prop;
             this.easing = easing || "swing";
@@ -8695,22 +8727,26 @@
                 func = dataTypeExpression;
                 dataTypeExpression = "*";
             }
-
+            // console.log("addToPrefiltersOrTransports => enter",dataTypeExpression.toLowerCase().match(rnotwhite));
             var dataType,
                 i = 0,
                 dataTypes = dataTypeExpression.toLowerCase().match(rnotwhite) || [];
-
+            console.log("dataTypes = dataTypeExpression.t after");
             if (jQuery.isFunction(func)) {
+                console.log("if (jQuery.isFunction(func)) {   enter");
                 // For each dataType in the dataTypeExpression
                 while ((dataType = dataTypes[i++])) {
                     // Prepend if requested
                     if (dataType.charAt(0) === "+") {
                         dataType = dataType.slice(1) || "*";
+                        console.log("(structure[dataType] = structure[dataType] || []) before");
                         (structure[dataType] = structure[dataType] || []).unshift(func);
-
+                        console.log("(structure[dataType] = structure[dataType] || [])");
                         // Otherwise append
                     } else {
+                        console.log("(structure[dataType] = structure[dataType] || []) before");
                         (structure[dataType] = structure[dataType] || []).push(func);
+                        console.log("(structure[dataType] = structure[dataType] || []) after");
                     }
                 }
             }
@@ -8727,6 +8763,7 @@
             var selected;
             inspected[dataType] = true;
             jQuery.each(structure[dataType] || [], function (_, prefilterOrFactory) {
+                console.log("ajax callback structure[dataType] || [] =>");
                 var dataTypeOrTransport = prefilterOrFactory(options, originalOptions, jqXHR);
                 if (typeof dataTypeOrTransport === "string" && !seekingTransport && !inspected[dataTypeOrTransport]) {
                     options.dataTypes.unshift(dataTypeOrTransport);
@@ -8739,6 +8776,7 @@
             return selected;
         }
 
+        console.log("inspect(options.dataTypes[0]) || !inspected[\"*\"] && inspect(\"*\") => ");
         return inspect(options.dataTypes[0]) || !inspected["*"] && inspect("*");
     }
 
@@ -8748,13 +8786,17 @@
     function ajaxExtend(target, src) {
         var deep, key,
             flatOptions = jQuery.ajaxSettings.flatOptions || {};
-
+        console.log("src => ", src)
         for (key in src) {
             if (src[key] !== undefined) {
+                console.log("src[key] key => ", key, src[key]);
                 (flatOptions[key] ? target : (deep || (deep = {})))[key] = src[key];
+                console.log("target[key] key => ", key, deep);
+
             }
         }
         if (deep) {
+            console.log("jQuery.extend(true, target, deep); => ", target, deep);
             jQuery.extend(true, target, deep);
         }
 
@@ -8769,7 +8811,7 @@
         var firstDataType, ct, finalDataType, type,
             contents = s.contents,
             dataTypes = s.dataTypes;
-
+        console.log("ajaxHandleResponses enter => ");
         // Remove auto dataType and get content-type in the process
         while (dataTypes[0] === "*") {
             dataTypes.shift();
@@ -8994,6 +9036,8 @@
         // with both ajaxSettings and settings fields.
         // If target is omitted, writes into ajaxSettings.
         ajaxSetup: function (target, settings) {
+            console.log("target => ", target);
+            console.log("jQuery.ajaxSettings => ", jQuery.ajaxSettings)
             return settings ?
 
                 // Building a settings object
@@ -9034,11 +9078,14 @@
 
                 transport,
                 // Response headers
-                responseHeaders,
-                // Create the final options object
-                s = jQuery.ajaxSetup({}, options),
-                // Callbacks context
-                callbackContext = s.context || s,
+                responseHeaders;
+            // Create the final options object
+            console.log("var s  jQuery.ajaxSettings => ", jQuery.ajaxSettings);
+            console.log("options  jQuery.ajaxSettings =>", options);
+            var s = jQuery.ajaxSetup({}, options);
+            console.log("var s   => ", s);
+            // Callbacks context
+            var callbackContext = s.context || s,
                 // Context for global events is callbackContext if it is a DOM node or jQuery collection
                 globalEventContext = s.context && (callbackContext.nodeType || callbackContext.jquery) ?
                     jQuery(callbackContext) :
@@ -10137,7 +10184,7 @@
 
             if (jQuery.isFunction(options)) {
                 options = options.call(elem, i, curOffset);
-                console.log("jQuery.isFunction(options) options =  =>" , options);
+                console.log("jQuery.isFunction(options) options =  =>", options);
             }
 
             if (options.top != null) {
@@ -10389,6 +10436,7 @@
     return jQuery;
 
 }));
+
 // var {JSDOM} = require("jsdom");
 // var { window } = new JSDOM(`<!DOCTYPE html><p>Hello world</p>`);
 //
