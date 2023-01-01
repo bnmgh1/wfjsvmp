@@ -95,6 +95,7 @@ var OPCODE = {
     '|=': 1029,
     'in': 1030,
     'instanceof': 1031,
+    "**": 1032,
 }
 var OPCODE1 = {
     '!': 1032,
@@ -117,6 +118,20 @@ var OPCODE1 = {
 
         function vm_push(e, s) {
             return vm_stack[vm_stack.$0++] = e;
+        }
+
+        function vm_find_constant(a, b) {
+            var c;
+            if (a === vm_constant && !a.hasOwnProperty(b)) {
+                c = a.__proto__;
+                while (c != null) {
+                    if (c.hasOwnProperty(b)) {
+                        a = c;
+                        break
+                    } else c = c.__proto__;
+                }
+            }
+            return a;
         }
 
         function vm_push_2(e, s) {
@@ -207,6 +222,8 @@ var OPCODE1 = {
                     return opNum1 + opNum2
                 case "-":
                     return opNum1 - opNum2
+                case "**":
+                    return opNum1 ** opNum2
                 case "<<":
                     return opNum1 << opNum2
                 case ">>":
@@ -278,10 +295,12 @@ var OPCODE1 = {
             p_constant.__proto__ = constant, p_constant.$5 = args,
                 p = p.map(it => p_constant[it] = args[i++]), h = vm_enter.apply(this, [opcode.slice(s, e), 0, p_constant, [], 0, []]);
             // 通过args把需要的参数放到当前常量池中去,然后开始调用
+
             // for (i = 0; i < p.length; i++) {
             //     p_constant[p[i]] = args[i];
             // }
             // p_constant["arguments"] = args;
+
             return Array.isArray(h) ? (h = h[1], h) : void 0;
         }
 
@@ -350,20 +369,15 @@ var OPCODE1 = {
                     d = vm_get_value();
                     y = vm_get_value();
                     // console.log("push key => ", y);
-                    if (d === undefined || y === undefined || d[y] === undefined) {
-                        vm_push(undefined);
-                        // console.log(" 对象 => ", !!d && d.toString(), " key => ", y)
-                        break;
-                    } else if (d === vm_constant && !d.hasOwnProperty(y)) {
-                        h = d.__proto__;
-                        while (h != null) {
-                            if (h.hasOwnProperty(y)) {
-                                d = h;
-                                break
-                            } else h = h.__proto__;
-                        }
-                    }
-                    vm_push(d[y]);
+
+                    // if (d === undefined || y === undefined || d[y] === undefined) {
+                    //     vm_push(undefined);
+                    //     // console.log(" 对象 => ", !!d && d.toString(), " key => ", y)
+                    //     break;
+                    // } else d = vm_find_constant(d, y);
+                    // vm_push(d[y]);
+
+                    d === undefined || y === undefined || d[y] === undefined ? vm_push(undefined) : (d = vm_find_constant(d, y) , vm_push(d[y]));
                     break
                 case OPCODE.MOV_VAR:
                     /* value */
@@ -372,16 +386,11 @@ var OPCODE1 = {
                     d = vm_get_value();
                     /* key */
                     h = vm_get_value();
-                    if (d === vm_constant && !d.hasOwnProperty(h)) {
-                        m = d.__proto__;
-                        while (m != null) {
-                            if (m.hasOwnProperty(h)) {
-                                d = m;
-                                break
-                            } else m = m.__proto__;
-                        }
-                    }
+
+                    d = vm_find_constant(d, h);
+
                     d[h] = y;
+                    
                     vm_push_2(y);
                     break
                 case OPCODE.COMPUTE:
@@ -404,12 +413,14 @@ var OPCODE1 = {
                     break
                 case OPCODE.UPDATE:
                     /* 这里有二个值, 对象, key 最后是标识符 */
+                    /* symbol */
+                    y = vm_get_value();
                     /* 对象 */
                     d = vm_get_value();
                     /* key */
                     h = vm_get_value();
-                    /* symbol */
-                    y = vm_get_value();
+
+                    d = vm_find_constant(d, h);
                     // switch (y) {
                     //     case "++":
                     //         d[h]++;
@@ -418,6 +429,7 @@ var OPCODE1 = {
                     //         d[h]--;
                     //         break
                     // }
+
                     y == "++" ? d[h]++ : "--" == y && d[h]--;
                     break
                 case OPCODE.NEW_ARRAY:
@@ -476,7 +488,6 @@ var OPCODE1 = {
                     vm_push(y);
                     break
                 case OPCODE.APPLY:
-                    /* 定义在window下的方法,this是window,那在构造方法下呢? */
                     /* 调用者 */
                     y = vm_get_value();
                     /* 自定义方法 */
@@ -503,7 +514,6 @@ var OPCODE1 = {
                     //     /* 方法调用管你要不要值,我都直接push到堆栈里呢 */
                     //
                     // }
-
                     h === void 0 ? vm_push_fake_2(d) : h.hasOwnProperty("$0") ? (d = h.apply(y, d), vm_push(d)) :
                         (h.name === "toString" ? d = y.toString(d[0]) : d = h.apply(y, d), vm_push(d));
                     break
@@ -527,12 +537,13 @@ var OPCODE1 = {
                     break
                 case OPCODE.IS_TRUE:
                     y = vm_get_value();
-                    if (!!y) {
-                        index++;
-                    } else {
-                        d = vm_get_opcode();
-                        index += d;
-                    }
+                    // if (!!y) {
+                    //     index++;
+                    // } else {
+                    //     d = vm_get_opcode();
+                    //     index += d;
+                    // }
+                    !!y ? index++ : (d = vm_get_opcode(), index += d);
                     break
                 case OPCODE.SKIP_BLOCK:
                     y = vm_get_opcode();
@@ -716,8 +727,9 @@ var OPCODE1 = {
                     vm_stack.$0--;
                     break
                 case OPCODE.RETURN:
-                    y = vm_get_value();
-                    return [0, y];
+                    // y = vm_get_value();
+                    // return [0, y];
+                    return [0, vm_get_value()];
                 case OPCODE.DEBUG:
                     debugger;
                     break
@@ -903,78 +915,99 @@ var OPCODE1 = {
                     y = h -= d;
                     vm_push(y);
                     break;
+
                 case OPCODE["<<="]:
                     d = vm_get_value();
                     h = vm_get_value();
                     y = h <<= d;
                     vm_push(y);
                     break;
+
                 case OPCODE[">>="]:
                     d = vm_get_value();
                     h = vm_get_value();
                     y = h >>= d;
                     vm_push(y);
                     break;
+
                 case OPCODE["^="]:
                     d = vm_get_value();
                     h = vm_get_value();
                     y = h ^= d;
                     vm_push(y);
                     break;
+
                 case OPCODE["|="]:
                     d = vm_get_value();
                     h = vm_get_value();
                     y = h |= d;
                     vm_push(y);
                     break;
+
                 case OPCODE["in"]:
                     d = vm_get_value();
                     h = vm_get_value();
                     y = h in d;
                     vm_push(y);
                     break;
+
                 case OPCODE["instanceof"]:
                     d = vm_get_value();
                     h = vm_get_value();
                     y = h instanceof d;
                     vm_push(y);
                     break;
+
+                case OPCODE["**"]:
+                    d = vm_get_value();
+                    h = vm_get_value();
+                    y = h ** d;
+                    vm_push(y);
+                    break;
+
                 case OPCODE1["!"]:
                     d = vm_get_value();
                     h = vm_get_value_fake();
                     y = !d;
                     vm_push(y);
                     break;
+
                 case OPCODE1["+"]:
                     d = vm_get_value();
                     h = vm_get_value_fake();
                     y = +d
                     vm_push(y);
                     break;
+
                 case OPCODE1["-"]:
                     d = vm_get_value();
                     h = vm_get_value_fake();
                     y = -d;
                     vm_push(y);
                     break;
+
+
                 case OPCODE1["~"]:
                     d = vm_get_value();
                     h = vm_get_value_fake();
                     y = ~d
                     vm_push(y);
                     break;
+
                 case OPCODE1["typeof"]:
                     d = vm_get_value();
                     h = vm_get_value_fake();
                     y = typeof d;
                     vm_push(y);
                     break;
+
                 case OPCODE1["void"]:
                     d = vm_get_value();
                     h = vm_get_value_fake();
                     y = void d;
                     vm_push(y);
                     break;
+
                 default:
                     console.log("index => ", index, "opcode => err => ", g);
                     debugger;
