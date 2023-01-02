@@ -290,8 +290,10 @@ var OPCODE1 = {
 
         function vm_call(s, e, p, z, args, constant) {
             var i = 0, p_constant = {};
+
             // if (!z.$4) z.$4 = {};
             // var p_constant = z.$4;
+
             p_constant.__proto__ = constant, p_constant.$5 = args,
                 p = p.map(it => p_constant[it] = args[i++]), h = vm_enter.apply(this, [opcode.slice(s, e), 0, p_constant, [], 0, []]);
             // 通过args把需要的参数放到当前常量池中去,然后开始调用
@@ -343,11 +345,9 @@ var OPCODE1 = {
                 case OPCODE.PUSH_STR:
                     h = vm_opcodeToString.apply(undefined, [vm_slice()]);
                     vm_push(h);
-
                     // if (is_console) {
                     //     console.log("push 字符串 => ", h);
                     // }
-
                     break
                 case OPCODE.PUSH_NUM:
                     h = vm_get_opcode();
@@ -408,11 +408,14 @@ var OPCODE1 = {
                     d = vm_get_value();
                     /* symbol */
                     y = vm_get_value();
-                    h = vmExpression_single_calc(y, d)
+
+                    h = vmExpression_single_calc(y, d);
+
                     vm_push(h);
                     break
                 case OPCODE.UPDATE:
                     /* 这里有二个值, 对象, key 最后是标识符 */
+
                     /* symbol */
                     y = vm_get_value();
                     /* 对象 */
@@ -421,6 +424,7 @@ var OPCODE1 = {
                     h = vm_get_value();
 
                     d = vm_find_constant(d, h);
+
                     // switch (y) {
                     //     case "++":
                     //         d[h]++;
@@ -435,10 +439,12 @@ var OPCODE1 = {
                 case OPCODE.NEW_ARRAY:
                     /* new 一个 array 后面跟的是初始化的对象个数 */
                     y = vm_get_opcode();
+
                     // d = Array();
                     // for (var i = 0; i < y; i++) {
                     //     d[y - i - 1] = vm_get_value();
                     // }
+
                     d = vm_stack_splice(vm_stack.$0 - y, y);
                     vm_stack.$0 = vm_stack.$0 - y;
                     vm_push(d);

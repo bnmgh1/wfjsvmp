@@ -104,7 +104,7 @@ var NEW_OPCODE = {};
 var NEW_OPCODE1 = {};
 
 /* 一个指令对应几种字节码, 也意味着vmp代码cases会翻几倍 */
-var times = 1,
+var times = 15,
     turn, vmp_turn;
 /* 开关, 膨胀指令对应字节码以及vm代码混淆 */
 turn = vmp_turn = 1;
@@ -230,6 +230,7 @@ function push_update_stack(opcode, node) {
     return opcode;
 }
 
+/* 遍历节点 转成字节码 */
 function generate(node) {
     var opcode = [];
     switch (node.type) {
@@ -1219,8 +1220,7 @@ const arr_func_to_func = {
 /* var b,se = {};(b = se.aa = {'a':1,'c':'aaa','dd':{'ccc':'123'}}).dd.m = b.dd.ccc; =>
 *                  (b = se.aa = {'a':1,'c':'aaa','dd':{'ccc':'123'}}),b.dd.m = b.dd.ccc;
 * 可能会有问题,遇到语法还得添加判断
-* 后来才知道, v8先从左边对象开始,再右边
-* 改呗 */
+* 后来才知道, v8先从左边对象开始,再右边 */
 const sequencing = {
     MemberExpression(path) {
         if ((!!(path.get("object").type === "AssignmentExpression"))) {
@@ -1510,10 +1510,6 @@ code = fs.readFileSync("./md5.js") + ''
 // code = fs.readFileSync("./vmp.js") + ''
 
 
-// code = "try{throw 1}catch(e){console.log(e);}finally{console.log('end')}console.log('zcj');"
-// code = "function a(){try{return 111}catch(e){}finally{console.log('end');return 222}}console.log(a());"
-// code = "var b,se={};(b = se.aa = {'a':1,'c':'aaa','dd':{'ccc':'123'}}).dd.m = b.dd.ccc;console.log(b);"
-
 
 var ast = parse(code);
 var opcode = [];
@@ -1551,7 +1547,7 @@ var junk_code_rate = 2;
 /* 不添加函数的概率 */
 var not_not_new_junk_rate = 3;
 /* vm方法复制几倍 */
-var vm_copy_count = 1;
+var vm_copy_count = 10;
 /* 花指令 */
 const junkCodeModule = {
     'FunctionDeclaration'(path) {
@@ -2300,7 +2296,8 @@ const noname = {
 }
 
 var s_track = [], s_name;
-/* 提取字符串和数字 */
+
+/* 提取字符串和数字, 挺影响速度的 */
 const noname1 = {
     FunctionExpression(path) {
         var scope_ = path.scope;
@@ -2334,6 +2331,7 @@ const noname1 = {
     }
 }
 
+/* 删掉前几行代码,node运行环境的代码 */
 const delete_code = {
     Program(path) {
         for (let i = 0; i < 6; i++) {
@@ -2349,7 +2347,6 @@ function new_vmp_code() {
     var vm_code = fs.readFileSync("./new_vm_enter.js") + '';
     ast = parse(vm_code);
     traverse(ast, noname);
-
     traverse(ast, delete_code);
     traverse(ast, copy_block);
     ast = parse(generator(ast).code);
@@ -2363,9 +2360,9 @@ function new_vmp_code() {
     traverse(ast, replace_vmstack_call);
 
     /* 生成花指令函数 */
-    // traverse(ast, junkCodeModule);
-    // ast = parse(generator(ast).code);
-    // traverse(ast, replace_call);
+    traverse(ast, junkCodeModule);
+    ast = parse(generator(ast).code);
+    traverse(ast, replace_call);
 
     console.log("vmp混淆耗时 -> ", +new Date() - a);
 
