@@ -113,7 +113,7 @@ var OPCODE1 = {
             for (m = 0; m < e.length; m++) {
                 b[m] = a["apply"](String, [e[m]]);
             }
-            return s = b.join('');
+            return m = b.join('');
         }
 
         function vm_push(e, s) {
@@ -390,7 +390,7 @@ var OPCODE1 = {
                     d = vm_find_constant(d, h);
 
                     d[h] = y;
-                    
+
                     vm_push_2(y);
                     break
                 case OPCODE.COMPUTE:
@@ -584,6 +584,7 @@ var OPCODE1 = {
                     }
                     break
                 case OPCODE.PASS:
+                    vm_push_fake_1(void 0);
                     break
                 case OPCODE.TRUE:
                     h = void 0;
