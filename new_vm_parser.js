@@ -108,8 +108,16 @@ var times = 15,
     turn, vmp_turn;
 /* 开关, 膨胀指令对应字节码以及vm代码混淆 */
 turn = vmp_turn = 1;
-/* 用字符串symbol来进行函数调用计算结果. 使用频率为 1/4 */
+/* 用字符串symbol函数调用来计算结果. 使用频率为 1/4 */
 var use_symbol_rate = 4;
+/* 新增的花指令函数名称 */
+var junk_func_name = [];
+/* 替换运算的概率 1/2 */
+var junk_code_rate = 2;
+/* 不添加花指令函数的概率 */
+var not_not_new_junk_rate = 3;
+/* vm方法复制几倍 */
+var vm_copy_count = 10;
 
 /* 是否让字符串字节码 + 66 */
 var string_code = true;
@@ -1205,8 +1213,7 @@ const deleteConsole = {
         }
     }
 }
-/* a.map(it => return 1;) => a.map(function(it){return 1}); 还需要判断return返回.
-直接用库把es6 => es5. 直接不写,摆烂. 不写也不行.这个库有问题 */
+/* a.map(it => return 1;) => a.map(function(it){return 1});  https://babeljs.io/repl 把es6转es5 */
 const arr_func_to_func = {
     ArrowFunctionExpression(path) {
         var body = path.node.body;
@@ -1541,13 +1548,7 @@ console.log("翻译耗时 -> ", +new Date() - a);
 
 
 /* 生成一份新的vmp代码 */
-var junk_func_name = [];
-/* 替换运算的概率 1/2 */
-var junk_code_rate = 2;
-/* 不添加函数的概率 */
-var not_not_new_junk_rate = 3;
-/* vm方法复制几倍 */
-var vm_copy_count = 10;
+
 /* 花指令 */
 const junkCodeModule = {
     'FunctionDeclaration'(path) {
@@ -1852,9 +1853,7 @@ const copy_block = {
         }
     }
 }
-/* vm_push 有概率转-> vm_push_2 老是用一个push 太假了
-*  get_value 有概率变成 -> vm_stack[--vm_esp]
-* */
+/* vm_push 有概率转-> vm_push_2  -> get_value 有概率变成 -> vm_stack[--vm_esp] */
 const push_to_push2 = {
     FunctionDeclaration(path) {
         if (!(path.node.id.name === "vm_enter")) return;
@@ -1880,9 +1879,10 @@ const push_to_push2 = {
         }
     }
 }
-/* 复制vm代码 */
+
 var func_name_track = {};
-var _ = []
+var _ = [];
+/* 复制vm代码 */
 const copy_vm_function = {
     FunctionDeclaration(path) {
         if (!(path.node.id.name === "vm_enter")) return;
@@ -2201,7 +2201,7 @@ const replace_vm_call = {
         path.stop();
     }
 }
-
+/* vm_stack函数替换指针 */
 const replace_vmstack_call = {
     FunctionDeclaration(path) {
         if (!(path.node.id.name === "vm_enter")) return;
@@ -2276,9 +2276,7 @@ const return_opcode = {
 
     }
 }
-/*
-y = h &= d; -> y = h = h & d;
-*/
+/* y = h &= d; -> y = h = h & d; */
 const noname = {
     AssignmentExpression(path) {
         var operator = path.node.operator;
