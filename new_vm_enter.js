@@ -109,11 +109,15 @@ var OPCODE1 = {
 (function (constant) {
     function vm_enter(opcode, index, constant, stack, esp, obj_arr) {
         function vm_opcodeToString(e, s) {
-            var a = String["fromCharCode"], b = [];
-            for (m = 0; m < e.length; m++) {
-                b[m] = a["apply"](String, [e[m]]);
-            }
-            return m = b.join('');
+            s = [];
+            m = 0;
+            // for (m = 0; m < e.length; m++) {
+            //     b[m] = a["apply"](String, [e[m] - 66]);
+            // }
+            e.map(it => {
+                return s[m++] = from_char_code(this, it - 66);
+            });
+            return m = s.join('');
         }
 
         function vm_push(e, s) {
@@ -303,11 +307,12 @@ var OPCODE1 = {
             // }
             // p_constant["arguments"] = args;
 
-            return Array.isArray(h) ? (h = h[1], h) : void 0;
+            return Ar.isArray(h) ? (h = h[1], h) : void 0;
         }
 
-        var vm_stack, h, y, d, g, m, cz, zc,
-            hj, jk, lk, ik,
+        var vm_stack, h, y, d, g, m, cz, zc, st = String, Ar = Array, Wi = window,
+            pthis = this,
+            hj, jk, lk, ik, from_char_code = st["fromCharCode"].bind(st).call.bind(st["fromCharCode"].bind(st)),
             vm_constant = constant, stack_splice, op_slice;
         vm_stack = !stack ? [] : stack, vm_stack.$0 = esp, cz = [], zc = cz.splice, stack_splice = zc.bind(vm_stack).call.bind(zc.bind(vm_stack)), op_slice = zc.bind(opcode).call.bind(zc.bind(opcode));
 
@@ -340,7 +345,7 @@ var OPCODE1 = {
             }
             switch (g) {
                 case OPCODE.PUSH_WINDOW:
-                    vm_push(window);
+                    vm_push(Wi);
                     break
                 case OPCODE.PUSH_STR:
                     h = vm_opcodeToString.apply(undefined, [vm_slice()]);
@@ -363,7 +368,7 @@ var OPCODE1 = {
                     vm_push(vm_constant);
                     break
                 case OPCODE.PUSH_THIS:
-                    vm_push(this);
+                    vm_push(pthis);
                     break
                 case OPCODE.PUSH_VAR:
                     d = vm_get_value();
@@ -606,7 +611,7 @@ var OPCODE1 = {
                         y = vm_slice();
                         d += y.length + 1;
                         h = vm_enter.apply(this, [y, 0, vm_constant, vm_stack, vm_stack.$0, []]);
-                        if (Array.isArray(h)) {
+                        if (Ar.isArray(h)) {
                             d = h[0] , y = h[1];
                             /* 这里多了2 try + slice 导致的index+2 */
                             switch (d) {
@@ -638,7 +643,7 @@ var OPCODE1 = {
                         vm_push(e);
                         m = vm_slice();
                         h = vm_enter.apply(this, [m, 0, vm_constant, vm_stack, vm_stack.$0, []]);
-                        if (Array.isArray(h)) {
+                        if (Ar.isArray(h)) {
                             d = h[0] , y = h[1];
                             /* 这里多了2 try + slice 导致的index+2 */
                             switch (d) {
@@ -673,7 +678,7 @@ var OPCODE1 = {
                         if (y === OPCODE.FINALLY) {
                             m = vm_slice();
                             h = vm_enter.apply(this, [m, 0, vm_constant, vm_stack, vm_stack.$0, []]);
-                            if (Array.isArray(h)) {
+                            if (Ar.isArray(h)) {
                                 d = h[0] , y = h[1];
                                 /* 这里多了2 try + slice 导致的index+2 */
                                 switch (d) {
@@ -710,7 +715,7 @@ var OPCODE1 = {
                         vm_push(lk);
                         vm_push_2(cz);
                         h = vm_enter.apply(this, [zc, 0, vm_constant, vm_stack, vm_stack.$0, []]);
-                        if (Array.isArray(h)) {
+                        if (Ar.isArray(h)) {
                             m = h[0] , y = h[1];
                             switch (m) {
                                 case OPCODE.BREAK:
@@ -877,78 +882,78 @@ var OPCODE1 = {
                 case OPCODE["="]:
                     d = vm_get_value();
                     h = vm_get_value();
-                    y = h = d;
-                    vm_push(y);
+                    h = d;
+                    vm_push(h);
                     break;
 
                 case OPCODE["*="]:
                     d = vm_get_value();
                     h = vm_get_value();
-                    y = h *= d;
-                    vm_push(y);
+                    h *= d;
+                    vm_push(h);
                     break;
 
                 case OPCODE["/="]:
                     d = vm_get_value();
                     h = vm_get_value();
-                    y = h /= d;
-                    vm_push(y);
+                    h /= d;
+                    vm_push(h);
                     break;
 
                 case OPCODE["%="]:
                     d = vm_get_value();
                     h = vm_get_value();
-                    y = h %= d;
-                    vm_push(y);
+                    h %= d;
+                    vm_push(h);
                     break;
 
                 case OPCODE["&="]:
                     d = vm_get_value();
                     h = vm_get_value();
-                    y = h &= d;
-                    vm_push(y);
+                    h &= d;
+                    vm_push(h);
                     break;
 
                 case OPCODE["+="]:
                     d = vm_get_value();
                     h = vm_get_value();
-                    y = h += d;
-                    vm_push(y);
+                    h += d;
+                    vm_push(h);
                     break;
 
                 case OPCODE["-="]:
                     d = vm_get_value();
                     h = vm_get_value();
-                    y = h -= d;
-                    vm_push(y);
+                    h -= d;
+                    vm_push(h);
                     break;
 
                 case OPCODE["<<="]:
                     d = vm_get_value();
                     h = vm_get_value();
-                    y = h <<= d;
-                    vm_push(y);
+                    h <<= d;
+                    vm_push(h);
                     break;
 
                 case OPCODE[">>="]:
                     d = vm_get_value();
                     h = vm_get_value();
-                    y = h >>= d;
-                    vm_push(y);
+                    h >>= d;
+                    vm_push(h);
                     break;
 
                 case OPCODE["^="]:
                     d = vm_get_value();
                     h = vm_get_value();
-                    y = h ^= d;
-                    vm_push(y);
+                    h ^= d;
+                    vm_push(h);
                     break;
 
                 case OPCODE["|="]:
                     d = vm_get_value();
                     h = vm_get_value();
-                    y = h |= d;
-                    vm_push(y);
+                    h |= d;
+                    vm_push(h);
                     break;
 
                 case OPCODE["in"]:

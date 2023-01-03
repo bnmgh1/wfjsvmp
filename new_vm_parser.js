@@ -104,7 +104,7 @@ var NEW_OPCODE = {};
 var NEW_OPCODE1 = {};
 
 /* 一个指令对应几种字节码, 也意味着vmp代码cases会翻几倍 */
-var times = 15,
+var times = 10,
     turn, vmp_turn;
 /* 开关, 膨胀指令对应字节码以及vm代码混淆 */
 turn = vmp_turn = 1;
@@ -121,7 +121,7 @@ var vm_copy_count = 10;
 
 /* 是否让字符串字节码 + 66 */
 var string_code = true;
-string_code = false;
+// string_code = false;
 
 /* 回填模式 */
 var mode = {
@@ -649,6 +649,7 @@ function generate(node) {
             if (node.node.computed) {
                 property_opcode = backfill_opcode(property_opcode, mode.backfill_identifier, OPCODE.PUSH_VAR);
             } else {
+
                 // property_opcode = backfill_opcode(property_opcode, mode.backfill_identifier, OPCODE.PASS);
                 // property_opcode = backfill_opcode(property_opcode, mode.backfill_CONSTANT, OPCODE.PASS);
 
