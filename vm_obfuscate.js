@@ -314,7 +314,7 @@ function obfuscate(vm_code) {
         },
         output: {
             bracketize: true,
-            beautify: true,
+            // beautify: true,
         },
     });
     return r.code;

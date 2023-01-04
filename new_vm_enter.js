@@ -106,18 +106,21 @@ var OPCODE1 = {
     'void': 1037,
 };
 
-(function (constant) {
-    function vm_enter(opcode, index, constant, stack, esp, obj_arr) {
+(function (constant, obj_arr) {
+    function vm_enter(opcode, index, constant, stack, esp) {
         function vm_opcodeToString(e, s) {
-            s = [];
-            m = 0;
-            // for (m = 0; m < e.length; m++) {
-            //     b[m] = a["apply"](String, [e[m] - 66]);
-            // }
-            e.map(it => {
+            // s = [];
+            // m = 0;
+            // // for (m = 0; m < e.length; m++) {
+            // //     b[m] = a["apply"](String, [e[m] - 66]);
+            // // }
+            // e.map(it => {
+            //     return s[m++] = from_char_code(this, it - 66);
+            // });
+            // return m = s.join('');
+            return s = [], m = 0, e.map(it => {
                 return s[m++] = from_char_code(this, it - 66);
-            });
-            return m = s.join('');
+            }), m = s.join('');
         }
 
         function vm_push(e, s) {
@@ -167,13 +170,15 @@ var OPCODE1 = {
         }
 
         function vm_slice() {
-            var result;
-            // 字符串长度
-            h = vm_get_opcode();
-            result = opcode.slice(index, index + h);
-            // result = op_slice(this, index, index + h);
-            index += h;
-            return result;
+            // hj = !hj ? hj : void 0;
+            // // 字符串长度
+            // h = vm_get_opcode();
+            // h = !st ? (st = String, h >> 6) : h;
+            // hj = opcode.slice(index, index + h);
+            // // result = op_slice(this, index, index + h);
+            // index += h;
+            // return hj;
+            return hj = !hj ? hj : void 0, h = vm_get_opcode(), h = !st ? (st = String, h >> 6) : h , hj = op_slice(null, index, index + h), index += h, hj;
         }
 
         function vm_stack_splice(s, e) {
@@ -293,32 +298,28 @@ var OPCODE1 = {
         }
 
         function vm_call(s, e, p, z, args, constant) {
-            var i = 0, p_constant = {};
-
             // if (!z.$4) z.$4 = {};
-            // var p_constant = z.$4;
+            // var jk = z.$4;
 
-            p_constant.__proto__ = constant, p_constant.$5 = args,
-                p = p.map(it => p_constant[it] = args[i++]), h = vm_enter.apply(this, [opcode.slice(s, e), 0, p_constant, [], 0, []]);
             // 通过args把需要的参数放到当前常量池中去,然后开始调用
 
             // for (i = 0; i < p.length; i++) {
-            //     p_constant[p[i]] = args[i];
+            //     jk[p[i]] = args[i];
             // }
-            // p_constant["arguments"] = args;
+            // jk["arguments"] = args;
 
-            return Ar.isArray(h) ? (h = h[1], h) : void 0;
+            return hj = 0, jk = {}, jk.__proto__ = constant,
+                jk.$5 = args,
+                p = p.map(it => jk[it] = args[hj++]), h = vm_enter.apply(this, [op_slice(null, s, e), 0, jk, [], 0]),
+                Ar.isArray(h) ? (h = h[1], h) : void 0;
         }
 
         var vm_stack, h, y, d, g, m, cz, zc, st = String, Ar = Array, Wi = window,
-            pthis = this,
-            hj, jk, lk, ik, from_char_code = st["fromCharCode"].bind(st).call.bind(st["fromCharCode"].bind(st)),
+            pthis = this, symbol1, symbol2, Nu, Tr = toString,
+            hj, jk, lk, ik, from_char_code = st["fromCharCode"],
             vm_constant = constant, stack_splice, op_slice;
-        vm_stack = !stack ? [] : stack, vm_stack.$0 = esp, cz = [], zc = cz.splice, stack_splice = zc.bind(vm_stack).call.bind(zc.bind(vm_stack)), op_slice = zc.bind(opcode).call.bind(zc.bind(opcode));
+        vm_stack = !stack ? [] : stack, vm_stack.$0 = esp, cz = [], zc = cz.splice, jk = cz.slice, Nu = "number", symbol2 = "--", symbol1 = "++", from_char_code = from_char_code.bind(st).call.bind(from_char_code.bind(st)), stack_splice = zc.bind(vm_stack).call.bind(zc.bind(vm_stack)), op_slice = jk.bind(opcode).call.bind(jk.bind(opcode));
 
-        for (ik in obj_arr) {
-            vm_constant[obj_arr[ik]] = this["window"][obj_arr[ik]];
-        }
 
         // let get_key = (object, value) => {
         //     return Object.keys(object).find(key => object[key] === value)
@@ -348,6 +349,7 @@ var OPCODE1 = {
                     vm_push(Wi);
                     break
                 case OPCODE.PUSH_STR:
+                    st = undefined;
                     h = vm_opcodeToString.apply(undefined, [vm_slice()]);
                     vm_push(h);
                     // if (is_console) {
@@ -439,7 +441,7 @@ var OPCODE1 = {
                     //         break
                     // }
 
-                    y == "++" ? d[h]++ : "--" == y && d[h]--;
+                    y == symbol1 ? d[h]++ : symbol2 == y && d[h]--;
                     break
                 case OPCODE.NEW_ARRAY:
                     /* new 一个 array 后面跟的是初始化的对象个数 */
@@ -489,7 +491,7 @@ var OPCODE1 = {
                     //     h = vm_get_value();
                     //     y[h] = m;
                     // }
-                    zc = (zc = new Array(d)).fill(1);
+                    zc = (zc = new Ar(d)).fill(1);
                     cz = zc.map(it => {
                         m = vm_get_value(), h = vm_get_value(), y[h] = m, it
                     });
@@ -526,7 +528,7 @@ var OPCODE1 = {
                     //
                     // }
                     h === void 0 ? vm_push_fake_2(d) : h.hasOwnProperty("$0") ? (d = h.apply(y, d), vm_push(d)) :
-                        (h.name === "toString" ? d = y.toString(d[0]) : d = h.apply(y, d), vm_push(d));
+                        (h.name === Tr.name ? d = typeof d[0] == Nu ? y.toString(d[0]) : y.toString() : d = h.apply(y, d), vm_push(d));
                     break
                 case OPCODE.NEW_FUNC:
                     y = vm_get_opcode();
@@ -610,7 +612,7 @@ var OPCODE1 = {
                         /* try opcode */
                         y = vm_slice();
                         d += y.length + 1;
-                        h = vm_enter.apply(this, [y, 0, vm_constant, vm_stack, vm_stack.$0, []]);
+                        h = vm_enter.apply(this, [y, 0, vm_constant, vm_stack, vm_stack.$0]);
                         if (Ar.isArray(h)) {
                             d = h[0] , y = h[1];
                             /* 这里多了2 try + slice 导致的index+2 */
@@ -632,6 +634,9 @@ var OPCODE1 = {
                                 case 0:
                                     return h;
                                 default:
+                                    (function () {
+                                        debugger;
+                                    })();
                                     console.log("try 非BREAK CONTINUE RETURN 指令返回 => return ", h);
                             }
                         }
@@ -639,10 +644,10 @@ var OPCODE1 = {
                         index = d + 2;
                         m = vm_slice();
                         /* push e对象 */
-                        vm_enter.apply(this, [m, 0, vm_constant, vm_stack, vm_stack.$0, []]);
+                        vm_enter.apply(this, [m, 0, vm_constant, vm_stack, vm_stack.$0]);
                         vm_push(e);
                         m = vm_slice();
-                        h = vm_enter.apply(this, [m, 0, vm_constant, vm_stack, vm_stack.$0, []]);
+                        h = vm_enter.apply(this, [m, 0, vm_constant, vm_stack, vm_stack.$0]);
                         if (Ar.isArray(h)) {
                             d = h[0] , y = h[1];
                             /* 这里多了2 try + slice 导致的index+2 */
@@ -664,6 +669,9 @@ var OPCODE1 = {
                                 case 0:
                                     return h;
                                 default:
+                                    (function () {
+                                        debugger;
+                                    })();
                                     console.log("try 非BREAK CONTINUE RETURN 指令返回 => return ", h);
                             }
                         }
@@ -677,7 +685,7 @@ var OPCODE1 = {
                         }
                         if (y === OPCODE.FINALLY) {
                             m = vm_slice();
-                            h = vm_enter.apply(this, [m, 0, vm_constant, vm_stack, vm_stack.$0, []]);
+                            h = vm_enter.apply(this, [m, 0, vm_constant, vm_stack, vm_stack.$0]);
                             if (Ar.isArray(h)) {
                                 d = h[0] , y = h[1];
                                 /* 这里多了2 try + slice 导致的index+2 */
@@ -699,6 +707,9 @@ var OPCODE1 = {
                                     case 0:
                                         return h;
                                     default:
+                                        (function () {
+                                            debugger;
+                                        })();
                                         console.log("try 非BREAK CONTINUE RETURN 指令返回 => return ", h);
                                 }
                             }
@@ -714,20 +725,35 @@ var OPCODE1 = {
                         vm_push_2(ik);
                         vm_push(lk);
                         vm_push_2(cz);
-                        h = vm_enter.apply(this, [zc, 0, vm_constant, vm_stack, vm_stack.$0, []]);
+                        h = vm_enter.apply(this, [zc, 0, vm_constant, vm_stack, vm_stack.$0]);
                         if (Ar.isArray(h)) {
                             m = h[0] , y = h[1];
-                            switch (m) {
-                                case OPCODE.BREAK:
-                                    break
-                                case OPCODE.CONTINUE:
-                                    continue;
-                                case 0:
-                                    return h;
-                                default:
-                                    console.log("try 非BREAK CONTINUE RETURN 指令返回 => ", h);
-                                // return h;
+                            if (m == OPCODE.BREAK) {
+                                break;
+                            } else if (m == OPCODE.CONTINUE) {
+                                continue;
+                            } else if (m == 0) {
+                                return h;
+                            } else {
+                                (function () {
+                                    debugger;
+                                })();
+                                console.log("try 非BREAK CONTINUE RETURN 指令返回 => ", h);
                             }
+                            // switch (m) {
+                            //     case OPCODE.BREAK:
+                            //         break
+                            //     case OPCODE.CONTINUE:
+                            //         continue;
+                            //     case 0:
+                            //         return h;
+                            //     default:
+                            //         (function () {
+                            //             debugger;
+                            //         })();
+                            //         console.log("try 非BREAK CONTINUE RETURN 指令返回 => ", h);
+                            //     // return h;
+                            // }
                         }
                     }
                     break
@@ -1027,9 +1053,12 @@ var OPCODE1 = {
         }
     }
 
+    for (var i in obj_arr) {
+        constant[obj_arr[i]] = this["window"][obj_arr[i]];
+    }
     var opcode = eval(fs.readFileSync("./opcode.txt") + '');
     /* collect 存放for循环test 后 IS_TRUE的索引 */
-    vm_enter(opcode, 0, constant, void 0, 0, ['window']);
-}).apply(window, [constant = {"$_jsvmp": true}]);
+    vm_enter(opcode, 0, constant, void 0, 0);
+}).apply(window, [constant = {"$_jsvmp": true}, ['window']]);
 
 

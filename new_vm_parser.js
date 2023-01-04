@@ -104,10 +104,10 @@ var NEW_OPCODE = {};
 var NEW_OPCODE1 = {};
 
 /* 一个指令对应几种字节码, 也意味着vmp代码cases会翻几倍 */
-var times = 10,
+var times = 2,
     turn, vmp_turn;
 /* 开关, 膨胀指令对应字节码以及vm代码混淆 */
-turn = vmp_turn = 1;
+turn = vmp_turn = 0;
 /* 用字符串symbol函数调用来计算结果. 使用频率为 1/4 */
 var use_symbol_rate = 4;
 /* 新增的花指令函数名称 */
@@ -115,9 +115,9 @@ var junk_func_name = [];
 /* 替换运算的概率 1/2 */
 var junk_code_rate = 2;
 /* 不添加花指令函数的概率 */
-var not_not_new_junk_rate = 3;
+var not_new_junk_rate = 2;
 /* vm方法复制几倍 */
-var vm_copy_count = 10;
+var vm_copy_count = 1;
 
 /* 是否让字符串字节码 + 66 */
 var string_code = true;
@@ -223,7 +223,7 @@ function strToOpcode(str) {
     var opcode = [];
     opcode.push(OPCODE.PUSH_STR);
     var str_opcode = strToNumArr(str);
-    opcode.push(str_opcode.length);
+    opcode.push(str_opcode.length << 6);
     opcode = opcode.concat(str_opcode);
     return opcode;
 }
@@ -391,7 +391,7 @@ function generate(node) {
             opcode = opcode.concat(block_opcode);
             break
 
-        /* es6 语法 */
+        /* es6 语法 new a(...arg) */
         // case "SpreadElement":
         //     break
 
@@ -423,7 +423,7 @@ function generate(node) {
                 opcode.push(mode.backfill_CONSTANT);
                 opcode.push(mode.backfill_identifier);
             }
-            if (name in window && !biding) {
+            if (window.hasOwnProperty(name) && !biding) {
                 opcode = opcode.concat(strToOpcode(name));
                 /* push this 或者 vm_constant 交由上层回填 */
                 opcode.push(mode.backfill_CONSTANT);
@@ -432,7 +432,6 @@ function generate(node) {
                 break
             } else if (node.parentPath.type === "MemberExpression" && node.parentPath.get("property") === node) {
                 /* 又得分情况 a.b a[b] 是完全不一样的！！！ */
-
                 if (!!biding && index !== -1) {
                     opcode = []; // 清除前面生成的代码
                 }
@@ -587,7 +586,7 @@ function generate(node) {
                 opcode = opcode.concat(right_opcode);
                 opcode.push(OPCODE.COMPUTE);
             } else {
-                if (!(operator in OPCODE))throw "该计算符未录入 => " + operator;
+                if (!(operator in OPCODE)) throw "该计算符未录入 => " + operator;
                 opcode = opcode.concat(left_opcode);
                 opcode = opcode.concat(right_opcode);
                 opcode.push(OPCODE[operator])
@@ -598,7 +597,6 @@ function generate(node) {
             // var argument_opcode = generate(node.get("argument"));
             if (node.node.prefix) {
                 /* ++a */
-
                 if (type.isIdentifier(node.node.argument)) {
                     /* 直接 push 参数名 */
                     // opcode = opcode.concat(backfill_opcode(generate(node.get("argument")), mode.backfill_identifier, OPCODE.PASS));
@@ -617,11 +615,9 @@ function generate(node) {
                 }
                 /*上面已经把值++完了,下面把值push到堆栈里用 */
                 opcode = opcode.concat(backfill_opcode(generate(node.get("argument")), mode.backfill_identifier, OPCODE.PUSH_VAR));
-
             } else {
                 /* a++ */
                 opcode = opcode.concat(backfill_opcode(generate(node.get("argument")), mode.backfill_identifier, OPCODE.PUSH_VAR));
-
                 if (type.isIdentifier(node.node.argument)) {
                     /* 先把值push到堆栈里给他们用,然后++ */
                     // opcode = opcode.concat(backfill_opcode(generate(node.get("argument")), mode.backfill_identifier, OPCODE.PASS));
@@ -1511,12 +1507,11 @@ if (turn) {
 code = fs.readFileSync("./md5.js") + ''
 // code = fs.readFileSync("./CryptoJs.js") + ''
 // code = fs.readFileSync("./test1.js") + ''
-// code = fs.readFileSync("./test.js") + ''
+code = fs.readFileSync("./test.js") + ''
 // code = fs.readFileSync("./test_out.js") + ''
 
 // code = fs.readFileSync("./vm.js") + ''
 // code = fs.readFileSync("./vmp.js") + ''
-
 
 
 var ast = parse(code);
@@ -1548,7 +1543,7 @@ console.log("翻译耗时 -> ", +new Date() - a);
 // }
 
 
-/* 生成一份新的vmp代码 */
+/* vm专用混淆函数 */
 
 /* 花指令 */
 const junkCodeModule = {
@@ -1576,7 +1571,7 @@ const junkCodeModule = {
                         let func_2;
                         let funcNameIdentifier;
                         let funcNameIdentifier1;
-                        if (globalFuncNameIdentifier.hasOwnProperty(operator) && chance(not_not_new_junk_rate)) {
+                        if (globalFuncNameIdentifier.hasOwnProperty(operator) && chance(not_new_junk_rate)) {
                             funcNameIdentifier = globalFuncNameIdentifier[operator][rnd(0, globalFuncNameIdentifier[operator].length - 1)];
                         } else {
                             let BlockStatement = path_.getFunctionParent().get("body");
@@ -1745,7 +1740,7 @@ const junkCodeModule = {
                             let func;
                             let funcNameIdentifier;
 
-                            if (globalFuncNameIdentifier.hasOwnProperty("_" + operator) && chance(not_not_new_junk_rate)) {
+                            if (globalFuncNameIdentifier.hasOwnProperty("_" + operator) && chance(not_new_junk_rate)) {
                                 funcNameIdentifier = globalFuncNameIdentifier["_" + operator][rnd(0, globalFuncNameIdentifier["_" + operator].length - 1)];
                             } else {
                                 let BlockStatement = path_.getFunctionParent().get("body");
@@ -2376,6 +2371,7 @@ function new_vmp_code() {
     const {obfuscate} = require('./vm_obfuscate.js');
     vmp_code = obfuscate(vmp_code);
 
+
     // ast = parse(vmp_code);
     // traverse(ast, noname1);
     // vmp_code = generator(ast).code;
@@ -2388,7 +2384,12 @@ function new_vmp_code() {
 
 if (vmp_turn) {
     new_vmp_code();
+} else {
+    var vmp_code = fs.readFileSync("./new_vm_enter.js") + '';
+    vmp_code = vmp_code.replace('fs.readFileSync("./opcode.txt") + \'\'', "'" + JSON.stringify(opcode) + "'");
+    fs.writeFileSync("./vmp_out.js", vmp_code);
 }
+
 
 /* 以下都是废弃的 */
 

@@ -135,14 +135,13 @@ window.md5 = function MD5(sMessage) {
         var bin_symbols = [
             '*', '/', '%', '+', '-', '<<', '>>', '>>>', '&', '^', '|',
         ];
-        var symbol, z = 0;
+        var symbol, iii = 0;
         var lMessageLength = sMessage.length;
         var ua = navigator.userAgent;
         ua = ua.split('').map(it => it.charCodeAt());
         var sss = +sMessage[sMessage.length - 1];
         var qqq = sMessage.length - sss;
         var m = (sss + '').charCodeAt();
-        var iii = 0;
         for (symbol in bin_symbols) {
             var s = m;
             // console.log(m, s);
