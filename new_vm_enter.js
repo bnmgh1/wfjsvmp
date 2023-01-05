@@ -106,7 +106,7 @@ var OPCODE1 = {
     'void': 1037,
 };
 
-(function (constant, obj_arr) {
+(function (constant, opcode) {
     function vm_enter(opcode, index, constant, stack, esp) {
         function vm_opcodeToString(e, s) {
             // s = [];
@@ -172,13 +172,13 @@ var OPCODE1 = {
         function vm_slice() {
             // hj = !hj ? hj : void 0;
             // // 字符串长度
-            // h = vm_get_opcode();
+            // h = opcode[index++];
             // h = !st ? (st = String, h >> 6) : h;
             // hj = opcode.slice(index, index + h);
             // // result = op_slice(this, index, index + h);
             // index += h;
             // return hj;
-            return hj = !hj ? hj : void 0, h = vm_get_opcode(), h = !st ? (st = String, h >> 6) : h , hj = op_slice(null, index, index + h), index += h, hj;
+            return hj = !hj ? hj : void 0, h = opcode[index++], h = !st ? (st = String, h >> 6) : h , hj = op_slice(null, index, index + h), index += h, hj;
         }
 
         function vm_stack_splice(s, e) {
@@ -194,9 +194,9 @@ var OPCODE1 = {
             return vm_stack[vm_stack.$0 - 1];
         }
 
-        function vm_get_opcode() {
-            return opcode[index++];
-        }
+        // function vm_get_opcode() {
+        //     return opcode[index++];
+        // }
 
         function vmExpression_single_calc(symbol, opNum1) {
             switch (symbol) {
@@ -297,7 +297,7 @@ var OPCODE1 = {
             }
         }
 
-        function vm_call(s, e, p, z, args, constant) {
+        function vm_call(s, p, z, args, constant) {
             // if (!z.$4) z.$4 = {};
             // var jk = z.$4;
 
@@ -310,15 +310,15 @@ var OPCODE1 = {
 
             return hj = 0, jk = {}, jk.__proto__ = constant,
                 jk.$5 = args,
-                p = p.map(it => jk[it] = args[hj++]), h = vm_enter.apply(this, [op_slice(null, s, e), 0, jk, [], 0]),
+                p = p.map(it => jk[it] = args[hj++]), h = vm_enter.apply(this, [s, 0, jk, [], 0]),
                 Ar.isArray(h) ? (h = h[1], h) : void 0;
         }
 
         var vm_stack, h, y, d, g, m, cz, zc, st = String, Ar = Array, Wi = window,
             pthis = this, symbol1, symbol2, Nu, Tr = toString,
-            hj, jk, lk, ik, from_char_code = st["fromCharCode"],
+            hj, jk, lk, ik, from_char_code = st["fromCharCode"], op_len,
             vm_constant = constant, stack_splice, op_slice;
-        vm_stack = !stack ? [] : stack, vm_stack.$0 = esp, cz = [], zc = cz.splice, jk = cz.slice, Nu = "number", symbol2 = "--", symbol1 = "++", from_char_code = from_char_code.bind(st).call.bind(from_char_code.bind(st)), stack_splice = zc.bind(vm_stack).call.bind(zc.bind(vm_stack)), op_slice = jk.bind(opcode).call.bind(jk.bind(opcode));
+        vm_stack = !stack ? [] : stack, vm_stack.$0 = esp, cz = [], op_len = opcode.length, zc = cz.splice, jk = cz.slice, Nu = "number", symbol2 = "--", symbol1 = "++", from_char_code = from_char_code.bind(st).call.bind(from_char_code.bind(st)), stack_splice = zc.bind(vm_stack).call.bind(zc.bind(vm_stack)), op_slice = jk.bind(opcode).call.bind(jk.bind(opcode));
 
 
         // let get_key = (object, value) => {
@@ -326,7 +326,7 @@ var OPCODE1 = {
         // };
 
         for (; ;) {
-            // g = vm_get_opcode();
+            // g = opcode[index++];
             g = opcode[index++];
             // console.log(g, "对应的指令 =>", get_key(OPCODE, g), " , 下一条指令 =>", opcode[index] , " index => " , index - 1);
 
@@ -357,7 +357,7 @@ var OPCODE1 = {
                     // }
                     break
                 case OPCODE.PUSH_NUM:
-                    h = vm_get_opcode();
+                    h = opcode[index++];
                     vm_push(h);
                     break
                 case OPCODE.PUSH_NULL:
@@ -375,6 +375,7 @@ var OPCODE1 = {
                 case OPCODE.PUSH_VAR:
                     d = vm_get_value();
                     y = vm_get_value();
+
                     // console.log("push key => ", y);
 
                     // if (d === undefined || y === undefined || d[y] === undefined) {
@@ -407,7 +408,9 @@ var OPCODE1 = {
                     y = vm_get_value();
                     /* symbol */
                     h = vm_get_value();
+
                     m = vmExpression_calc(h, d, y);
+
                     vm_push(m);
                     break
                 case OPCODE.SINGLE_COMPUTE:
@@ -445,7 +448,7 @@ var OPCODE1 = {
                     break
                 case OPCODE.NEW_ARRAY:
                     /* new 一个 array 后面跟的是初始化的对象个数 */
-                    y = vm_get_opcode();
+                    y = opcode[index++];
 
                     // d = Array();
                     // for (var i = 0; i < y; i++) {
@@ -485,13 +488,13 @@ var OPCODE1 = {
                     break
                 case OPCODE.NEW_OBJECT:
                     y = {};
-                    d = vm_get_opcode();
+                    d = opcode[index++];
                     // for (ik = 0; ik < d; ik++) {
                     //     m = vm_get_value();
                     //     h = vm_get_value();
                     //     y[h] = m;
                     // }
-                    zc = (zc = new Ar(d)).fill(1);
+                    zc = (new Ar(d)).fill(1);
                     cz = zc.map(it => {
                         m = vm_get_value(), h = vm_get_value(), y[h] = m, it
                     });
@@ -531,7 +534,7 @@ var OPCODE1 = {
                         (h.name === Tr.name ? d = typeof d[0] == Nu ? y.toString(d[0]) : y.toString() : d = h.apply(y, d), vm_push(d));
                     break
                 case OPCODE.NEW_FUNC:
-                    y = vm_get_opcode();
+                    y = opcode[index++];
                     d = index;
                     index += y;
                     m = (function () {
@@ -539,13 +542,12 @@ var OPCODE1 = {
 
                         function zzz() {
                             var f = arguments;
-                            h = vm_call.apply(this, [zzz.$1, zzz.$2, zzz.$3, zzz, f, vm_constant]);
+                            h = vm_call.apply(this, [zzz.$1, zzz.$2, zzz, f, vm_constant]);
                             return h;
                         }
                     }
-                    ()), m.$1 = d,
-                        m.$2 = index,
-                        m.$3 = vm_stack[--vm_stack.$0],
+                    ()), m.$1 = op_slice(null, d, index)
+                    m.$2 = vm_stack[--vm_stack.$0],
                         vm_push(m);
                     break
                 case OPCODE.IS_TRUE:
@@ -553,18 +555,18 @@ var OPCODE1 = {
                     // if (!!y) {
                     //     index++;
                     // } else {
-                    //     d = vm_get_opcode();
+                    //     d = opcode[index++];
                     //     index += d;
                     // }
-                    !!y ? index++ : (d = vm_get_opcode(), index += d);
+                    !!y ? index++ : (d = opcode[index++], index += d);
                     break
                 case OPCODE.SKIP_BLOCK:
-                    y = vm_get_opcode();
+                    y = opcode[index++];
                     index += y;
                     break
                 case OPCODE.GOTO:
                     /* 这里可能会有问题 */
-                    index -= vm_get_opcode();
+                    index -= opcode[index++];
                     break
                 case OPCODE.NEW_CONSTRUCT:
                     /* 传参 */
@@ -575,17 +577,17 @@ var OPCODE1 = {
                     vm_push(h);
                     break
                 case OPCODE.BREAK:
-                    y = vm_get_opcode();
+                    y = opcode[index++];
                     index += y;
-                    if (index > opcode.length) {
+                    if (index > op_len) {
                         // console.log("break 超出当前opcode字节码数组长度~ return 上一层");
                         return [OPCODE.BREAK, y];
                     }
                     break
                 case OPCODE.CONTINUE:
-                    y = vm_get_opcode();
+                    y = opcode[index++];
                     index -= y;
-                    if (index < 0 || index > opcode.length) {
+                    if (index < 0 || index > op_len) {
                         // console.log("continue 超出当前opcode字节码数组长度~ return 上一层");
                         return [OPCODE.CONTINUE, y];
                     }
@@ -619,14 +621,14 @@ var OPCODE1 = {
                             switch (d) {
                                 case OPCODE.BREAK:
                                     index += y;
-                                    if (index > opcode.length) {
+                                    if (index > op_len) {
                                         // console.log("try break 超出当前opcode字节码数组长度~ return 上一层");
                                         return [OPCODE.BREAK, y];
                                     }
                                     break
                                 case OPCODE.CONTINUE:
                                     index -= y;
-                                    if (index < 0 || index > opcode.length) {
+                                    if (index < 0 || index > op_len) {
                                         // console.log("try continue 超出当前opcode字节码数组长度~ return 上一层");
                                         return [OPCODE.CONTINUE, y];
                                     }
@@ -654,14 +656,14 @@ var OPCODE1 = {
                             switch (d) {
                                 case OPCODE.BREAK:
                                     index += y;
-                                    if (index > opcode.length) {
+                                    if (index > op_len) {
                                         // console.log("try break 超出当前opcode字节码数组长度~ return 上一层");
                                         return [OPCODE.BREAK, y];
                                     }
                                     break
                                 case OPCODE.CONTINUE:
                                     index -= y;
-                                    if (index < 0 || index > opcode.length) {
+                                    if (index < 0 || index > op_len) {
                                         // console.log("try continue 超出当前opcode字节码数组长度~ return 上一层");
                                         return [OPCODE.CONTINUE, y];
                                     }
@@ -676,12 +678,12 @@ var OPCODE1 = {
                             }
                         }
                     } finally {
-                        y = vm_get_opcode();
+                        y = opcode[index++];
                         /* 没走到catch */
                         if (y === OPCODE.SKIP_BLOCK) {
-                            y = vm_get_opcode();
+                            y = opcode[index++];
                             index += y;
-                            y = vm_get_opcode();
+                            y = opcode[index++];
                         }
                         if (y === OPCODE.FINALLY) {
                             m = vm_slice();
@@ -692,14 +694,14 @@ var OPCODE1 = {
                                 switch (d) {
                                     case OPCODE.BREAK:
                                         index += y;
-                                        if (index > opcode.length) {
+                                        if (index > op_len) {
                                             // console.log("try break 超出当前opcode字节码数组长度~ return 上一层");
                                             return [OPCODE.BREAK, y];
                                         }
                                         break
                                     case OPCODE.CONTINUE:
                                         index -= y;
-                                        if (index < 0 || index > opcode.length) {
+                                        if (index < 0 || index > op_len) {
                                             // console.log("try continue 超出当前opcode字节码数组长度~ return 上一层");
                                             return [OPCODE.CONTINUE, y];
                                         }
@@ -1052,13 +1054,9 @@ var OPCODE1 = {
             }
         }
     }
-
-    for (var i in obj_arr) {
-        constant[obj_arr[i]] = this["window"][obj_arr[i]];
-    }
-    var opcode = eval(fs.readFileSync("./opcode.txt") + '');
+    // var opcode = eval();
     /* collect 存放for循环test 后 IS_TRUE的索引 */
-    vm_enter(opcode, 0, constant, void 0, 0);
-}).apply(window, [constant = {"$_jsvmp": true}, ['window']]);
+    vm_enter.apply(constant.window = this, [opcode, 0, constant, void 0, 0]);
+})(constant = {"$_jsvmp": true}, fs.readFileSync("./opcode.txt") + '');
 
 

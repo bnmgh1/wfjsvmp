@@ -107,7 +107,7 @@ var NEW_OPCODE1 = {};
 var times = 2,
     turn, vmp_turn;
 /* 开关, 膨胀指令对应字节码以及vm代码混淆 */
-turn = vmp_turn = 0;
+turn = vmp_turn = 1;
 /* 用字符串symbol函数调用来计算结果. 使用频率为 1/4 */
 var use_symbol_rate = 4;
 /* 新增的花指令函数名称 */
@@ -136,7 +136,7 @@ var mode = {
 /* 保存不同变量的作用域进行数字命名,不是修改js,再作用域下添加一个id对象. 使用ast直接对js重命名变量真的很卡 */
 var identifier_binding_track = [];
 
-/* PASS的opcode 直接删了占用性能 */
+/* PASS的opcode 直接删了否则占用性能 */
 function delete_opcode(opcode, mode) {
     var index;
     while (true) {
@@ -1504,7 +1504,7 @@ if (turn) {
 
 
 // code = fs.readFileSync("./jquery.js") + ''
-code = fs.readFileSync("./md5.js") + ''
+// code = fs.readFileSync("./md5.js") + ''
 // code = fs.readFileSync("./CryptoJs.js") + ''
 // code = fs.readFileSync("./test1.js") + ''
 code = fs.readFileSync("./test.js") + ''
@@ -2366,7 +2366,7 @@ function new_vmp_code() {
     a = +new Date();
 
     var vmp_code = generator(ast).code;
-    vmp_code = vmp_code.replace('fs.readFileSync("./opcode.txt") + \'\'', "'" + JSON.stringify(opcode) + "'");
+    vmp_code = vmp_code.replace('fs.readFileSync("./opcode.txt") + \'\'', JSON.stringify(opcode));
 
     const {obfuscate} = require('./vm_obfuscate.js');
     vmp_code = obfuscate(vmp_code);
@@ -2386,7 +2386,7 @@ if (vmp_turn) {
     new_vmp_code();
 } else {
     var vmp_code = fs.readFileSync("./new_vm_enter.js") + '';
-    vmp_code = vmp_code.replace('fs.readFileSync("./opcode.txt") + \'\'', "'" + JSON.stringify(opcode) + "'");
+    vmp_code = vmp_code.replace('fs.readFileSync("./opcode.txt") + \'\'', JSON.stringify(opcode));
     fs.writeFileSync("./vmp_out.js", vmp_code);
 }
 
