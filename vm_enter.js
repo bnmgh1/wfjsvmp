@@ -1,21 +1,39 @@
 var {JSDOM} = require("jsdom");
-var {window} = new JSDOM(`<!DOCTYPE html><p>Hello world</p>`);
+var {window} = new JSDOM(`
+<!doctype html>
+<html>
+<body>
+    <head>
+        <div style="">
+            <meta content="">
+            <meta>
+        </div>
+        <div>
+        bobo1
+        </div>
+        <div>
+        bobo2
+        </div>
+    </head>
+</body>
+</html>
+`);
 global["window"] = window;
 fs = require("fs");
 
-// zcj_console = console.log;
-// console.log = function () {
-//     try{
-//         if (arguments[0] === window) {
-//         debugger
-//     }
-//     }
-//     catch (e){
-//
-//     }
-//
-//     return zcj_console.apply(undefined, arguments);
-// }
+zcj_console = console.log;
+console.log = function () {
+    try{
+        if (arguments[0] === ">>" && arguments[1] == 77 && arguments[2] == 49) {
+        debugger
+    }
+    }
+    catch (e){
+
+    }
+
+    return zcj_console.apply(undefined, arguments);
+}
 
 var OPCODE = {
     PASS: 11, // 这是个无用字节码,不作任何操作
@@ -162,6 +180,7 @@ var OPCODE1 = {
         }
 
         function vm_get_value() {
+            if (vm_stack.vm_esp == 0){debugger;}
             return vm_stack[--vm_stack.vm_esp];
         }
 
@@ -311,7 +330,7 @@ var OPCODE1 = {
         for (; ;) {
             // g = vm_get_opcode();
             g = opcode[index++];
-
+            // console.log(g, index);
             // console.log(g, "对应的指令 =>", get_key(OPCODE, g), " , 下一条指令 =>", opcode[index] , " index => " , index - 1);
             // if (!get_key(OPCODE, g)) {
             //     debugger
@@ -645,7 +664,7 @@ var OPCODE1 = {
                     d = vm_get_value();
                     zc = vm_slice();
                     for (cz in d) {
-                        vm_push_2(cz);
+                        vm_push(cz);
                         h = vm_enter.apply(this, [zc, 0, vm_constant, vm_stack, vm_stack.vm_esp, []]);
                         if (Array.isArray(h)) {
                             m = h[0] , y = h[1];

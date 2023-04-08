@@ -124,7 +124,7 @@ window.md5 = function MD5(sMessage) {
             case "instanceof":
                 return opNum1 instanceof opNum2
             default:
-                // console.log("vmExpression_calc 没有这个 symbol =>", symbol)
+                console.log("md5 vmExpression_calc 没有这个 symbol =>", symbol)
                 return undefined
         }
     }
@@ -302,5 +302,4 @@ window.md5 = function MD5(sMessage) {
 
 }
 
-console.log(window.md5(+new Date + ''));
-
+console.log(window.md5("1"));

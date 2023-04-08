@@ -322,27 +322,27 @@ function obfuscate(vm_code) {
 }
 
 exports.obfuscate = obfuscate;
-const {UglifyJS} = require('./uglify_es.js');
-var r = UglifyJS.minify(fs.readFileSync("./vmp_out.js") + '', {
-        compress: {
-            drop_debugger: false,
-            hoist_vars: false,
-            join_vars: false,
-            sequences: false,
-            inline: false,
-            loops: false,
-            reduce_funcs: false,
-            reduce_vars: false,
-            collapse_vars: false,
-            comparisons: false,
-            computed_props: false,
-            conditionals: true,
-            evaluate: true,
-            expression: false,
-        },
-        output: {
-            bracketize: true,
-            beautify: true,
-        },
-    });
-fs.writeFileSync("./vmp.js", r.code);
+// const {UglifyJS} = require('./uglify_es.js');
+// var r = UglifyJS.minify(fs.readFileSync("./out/vmp_out.js") + '', {
+//         compress: {
+//             drop_debugger: false,
+//             hoist_vars: false,
+//             join_vars: false,
+//             sequences: false,
+//             inline: false,
+//             loops: false,
+//             reduce_funcs: false,
+//             reduce_vars: false,
+//             collapse_vars: false,
+//             comparisons: false,
+//             computed_props: false,
+//             conditionals: true,
+//             evaluate: true,
+//             expression: false,
+//         },
+//         output: {
+//             bracketize: true,
+//             beautify: true,
+//         },
+//     });
+// fs.writeFileSync("./out/vmp.js", r.code);

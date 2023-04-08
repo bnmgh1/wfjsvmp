@@ -103,7 +103,7 @@ var NEW_OPCODE1 = {};
 /* 一个指令对应几种字节码, 也意味着vmp代码cases会翻几倍 */
 var times = 10;
 /* 用字符串symbol来进行函数调用计算结果. 使用频率为 1/4 */
-var use_symbol_rate = 4;
+var use_symbol_rate = 0;
 
 /* 是否让字符串字节码 + 66 */
 var string_code = true;
@@ -379,7 +379,6 @@ function generate(node) {
                 break
             } else if (node.parentPath.type === "MemberExpression" && node.parentPath.get("property") === node) {
                 /* 又得分情况 a.b a[b] 是完全不一样的！！！ */
-
                 if (!!biding && index !== -1) {
                     opcode = []; // 清除前面生成的代码
                 }
@@ -450,7 +449,7 @@ function generate(node) {
             var left_opcode = generate(node.get("left"));
             if (node.node.operator !== "=") {
                 // console.log("AssignmentExpression 符号 => ", node.node.operator);
-                if (chance(use_symbol_rate)) {
+                if (use_symbol_rate && chance(use_symbol_rate)) {
                     opcode = opcode.concat(strToOpcode(operator));
                     opcode = opcode.concat(left_opcode);
                     opcode = opcode.concat(right_opcode);
@@ -491,7 +490,7 @@ function generate(node) {
             // opcode = opcode.concat(strToOpcode(node.node.operator));
             var left_opcode = generate(node.get("left"));
             var right_opcode = generate(node.get("right"));
-            if (chance(use_symbol_rate)) {
+            if (use_symbol_rate && chance(use_symbol_rate)) {
                 opcode = opcode.concat(strToOpcode(operator));
                 opcode = opcode.concat(left_opcode);
                 opcode = opcode.concat(right_opcode);
@@ -786,17 +785,17 @@ function generate(node) {
             // opcode.push(OPCODE.CATCH);
             // opcode.push(param_opcode.length + block_opcode.length);
             /* push e参数 */
-            opcode = opcode.concat(backfill_opcode(param_opcode, mode.backfill_identifier, OPCODE.MOV_VAR));
+            if (param_opcode) {
+                opcode = opcode.concat(backfill_opcode(param_opcode, mode.backfill_identifier, OPCODE.MOV_VAR));
+            }
             opcode = opcode.concat(block_opcode);
             break
         case "SwitchStatement":
-            /* 恶心节点之1, 确实如果break不去找到要跳过的索引,这个就很难做 */
+            /* 恶心节点之1, 如果break不去找到要跳过的索引,这个就很难做 */
             var SwitchCaseopcode;
-            var str_opcode = strToOpcode("==");
             var discriminant_opcode = generate(node.get("discriminant"));
             var len = node.node.cases.length;
             for (var i = 0; i < len; i++) {
-                opcode = opcode.concat(str_opcode);
                 opcode = opcode.concat(discriminant_opcode);
                 SwitchCaseopcode = generate(node.get("cases")[i]);
                 if (len > (i + 1)) {
@@ -804,19 +803,20 @@ function generate(node) {
                     SwitchCaseopcode[index] = SwitchCaseopcode.length + 2;
                     SwitchCaseopcode.push(OPCODE.SKIP_BLOCK);
                     /* compute is_true */
-
                     var test_opcode = generate(node.get("cases")[i + 1].get("test"));
+                    // default
                     if (!test_opcode) {
                         /* default */
                         test_opcode = discriminant_opcode;
                     }
-                    SwitchCaseopcode.push(test_opcode.length + str_opcode.length + discriminant_opcode.length + 3);
+                    SwitchCaseopcode.push(test_opcode.length + discriminant_opcode.length + 3);
                 } else {
                     var index = SwitchCaseopcode.indexOf(mode.backfill_IS_TRUE);
                     SwitchCaseopcode[index] = SwitchCaseopcode.length;
                 }
                 opcode = opcode.concat(SwitchCaseopcode);
             }
+            // 回填break跳出的字节码长度
             opcode = backfill_break(opcode);
             break
         case "SwitchCase":
@@ -827,7 +827,8 @@ function generate(node) {
             } else {
                 opcode = opcode.concat(generate(node.parentPath.get("discriminant")));
             }
-            opcode.push(OPCODE.COMPUTE);
+            // opcode.push(OPCODE.COMPUTE);
+            opcode.push(OPCODE["=="]);
             opcode.push(OPCODE.IS_TRUE);
             opcode.push(mode.backfill_IS_TRUE);
             var len = node.node.consequent.length;
@@ -935,14 +936,14 @@ function generate(node) {
             break
     }
     /* 默认回填push Identifier节点 */
-    if (node.type !== "Identifier" && opcode.indexOf(mode.backfill_identifier) !== -1) {
+    if (node.type !== "Identifier" && opcode.indexOf(mode.backfill_identifier) > -1) {
         opcode = backfill_opcode(opcode, mode.backfill_identifier, OPCODE.PUSH_VAR);
     }
     /* 默认回填 GET_OBJ */
-    if (node.type !== "MemberExpression" && opcode.indexOf(mode.backfill_member_expression) !== -1) {
+    if (node.type !== "MemberExpression" && opcode.indexOf(mode.backfill_member_expression) > -1) {
         opcode = backfill_opcode(opcode, mode.backfill_member_expression, OPCODE.GET_OBJ);
     }
-    if (opcode.indexOf(undefined) !== -1) {
+    if (opcode.indexOf(undefined) > -1) {
         debugger;
         console.log("生成的字节码有undefined => ", node + '')
     }
@@ -1077,7 +1078,7 @@ const deleteConsole = {
     }
 }
 /* a.map(it => return 1;) => a.map(function(it){return 1}); 还需要判断return返回.
-直接用库把es6 => es5. 直接不写,摆烂. 不写也不行.这个库有问题 */
+用网址转 */
 const arr_func_to_func = {
     ArrowFunctionExpression(path) {
         var body = path.node.body;
@@ -1111,24 +1112,28 @@ const sequencing = {
         } else return;
     }
 }
+
 /* `<div class="mm" ${a}style="transform: rotateY(${10 + 10 * iw}deg);">` => 字符串拼接 */
 const tempToStr = {
     TemplateLiteral(path) {
+
         var expressions = path.node.expressions;
         var quasis = path.node.quasis;
         if (quasis.length === 1) {
-            path.replaceWith(type.stringLiteral(quasis[i].value.raw));
+            path.replaceWith(type.stringLiteral(quasis[0].value.raw));
+            path.skip();
+        } else {
+            var binaryExpression;
+            binaryExpression = type.binaryExpression("+", type.stringLiteral(quasis[0].value.raw), expressions[0]);
+            binaryExpression = type.binaryExpression("+", binaryExpression, type.stringLiteral(quasis[1].value.raw));
+            for (var i = 1; i < expressions.length; i++) {
+                binaryExpression = type.binaryExpression("+", binaryExpression, expressions[i]);
+                binaryExpression = type.binaryExpression("+", binaryExpression, type.stringLiteral(quasis[i + 1].value.raw));
+            }
+            path.replaceWith(type.ExpressionStatement(binaryExpression));
             path.skip();
         }
-        var binaryExpression;
-        binaryExpression = type.binaryExpression("+", type.stringLiteral(quasis[0].value.raw), expressions[0]);
-        binaryExpression = type.binaryExpression("+", binaryExpression, type.stringLiteral(quasis[1].value.raw));
-        for (var i = 1; i < expressions.length; i++) {
-            binaryExpression = type.binaryExpression("+", binaryExpression, expressions[i]);
-            binaryExpression = type.binaryExpression("+", binaryExpression, type.stringLiteral(quasis[i + 1].value.raw));
-        }
-        path.replaceWith(type.ExpressionStatement(binaryExpression));
-        path.skip();
+
     }
 }
 /* 改变window下属性的访问方式 */
@@ -1227,7 +1232,7 @@ function expand_opcode(i) {
 
 /* 改写js */
 function transform_js(ast) {
-    traverse(ast, deleteConsole);
+    // traverse(ast, deleteConsole);
     traverse(ast, arr_func_to_func);
     traverse(ast, change_obj_key);
     traverse(ast, tempToStr);
@@ -1252,6 +1257,7 @@ function transform_js(ast) {
 
 // console.log(NEW_OPCODE);
 
+// 测试
 // code = "var b = {\"a\":\"c\",1:1,b:\"3\"};var a = 10; a += b[1];"
 // code = "var a = function(){ console.log(1);}; a();"
 // code = "throw new Error('zcj');"
@@ -2134,6 +2140,7 @@ const fill_call_params = {
         }
     },
 }
+
 /* 函数重命名 */
 /* 巨慢,这个rename */
 const rename_function = {

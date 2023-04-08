@@ -1,4 +1,5 @@
 var {JSDOM} = require("jsdom");
+// 在浏览器里运行话, 更好点
 var {window} = new JSDOM(`<!DOCTYPE html><p>Hello world</p>`);
 global["window"] = window;
 
@@ -918,11 +919,9 @@ function generate(node) {
         case "SwitchStatement":
             /* 恶心节点之1, 确实如果break不去找到要跳过的索引,这个就很难做 */
             var SwitchCaseopcode;
-            var str_opcode = strToOpcode("==");
             var discriminant_opcode = generate(node.get("discriminant"));
             var len = node.node.cases.length;
             for (var i = 0; i < len; i++) {
-                opcode = opcode.concat(str_opcode);
                 opcode = opcode.concat(discriminant_opcode);
                 SwitchCaseopcode = generate(node.get("cases")[i]);
                 if (len > (i + 1)) {
@@ -931,14 +930,13 @@ function generate(node) {
                     /* 这里的skip是因为可能要执行下一个case */
                     SwitchCaseopcode.push(OPCODE.SKIP_BLOCK);
                     /* compute is_true */
-
                     var test_opcode = generate(node.get("cases")[i + 1].get("test"));
                     if (!test_opcode) {
                         /* default */
                         test_opcode = discriminant_opcode;
                     }
                     /* 3是 COMPUTE  IS_TRUE backfill_IS_TRUE */
-                    SwitchCaseopcode.push(test_opcode.length + str_opcode.length + discriminant_opcode.length + 3);
+                    SwitchCaseopcode.push(test_opcode.length + discriminant_opcode.length + 3);
 
                 } else {
                     /* 最后一个 */
@@ -957,7 +955,8 @@ function generate(node) {
             } else {
                 opcode = opcode.concat(generate(node.parentPath.get("discriminant")));
             }
-            opcode.push(OPCODE.COMPUTE);
+            // opcode.push(OPCODE.COMPUTE);
+            opcode.push(OPCODE["=="]);
             opcode.push(OPCODE.IS_TRUE);
             opcode.push(mode.backfill_IS_TRUE);
             var len = node.node.consequent.length;
@@ -1361,7 +1360,7 @@ function expand_opcode(i) {
 
 /* 改写js */
 function transform_js(ast) {
-    traverse(ast, deleteConsole);
+    // traverse(ast, deleteConsole);
     traverse(ast, arr_func_to_func);
     traverse(ast, change_obj_key);
     traverse(ast, tempToStr);
@@ -1385,133 +1384,12 @@ if (turn) {
     expand_opcode(times);
 }
 
-
-// code = "var b = {\"a\":\"c\",1:1,b:\"3\"};var a = 10; a += b[1];"
-// code = "var a = function(){ console.log(1);}; a();"
-// code = "throw new Error('zcj');"
-// code = "var e = \"e\"\n" +
-//     "try {\n" +
-//     "    var q = \"123\";\n" +
-//     "    throw \"zcj\";\n" +
-//     "} catch (e) {\n" +
-//     "    console.log(e);\n" +
-//     "    var s = \"456\";\n" +
-//     "    try{\n" +
-//     "        q = \"777\";\n" +
-//     "        throw \"zcj\";\n" +
-//     "    }catch(e){\n" +
-//     "        q = \"888\"\n" +
-//     "    }finally{\n" +
-//     "        \n" +
-//     "    }\n" +
-//     "}finally{\n" +
-//     "    console.log(e);\n" +
-//     "    var m = \"1\";\n" +
-//     "}\n" +
-//     "console.log(s);\n" +
-//     "console.log(q);\n" +
-//     "console.log(m);"
-// code = "var a = {'a':{}}; a.a.c = 1000; console.log(a.a.c);"
-// code = "var c = 1;var a = b = 1; console.log(b);"
-// code = "function e() {\n" +
-//     "var r = [\"mJCZodK3nNfKsNPmwa\", \"r0vzq094vvC\", \"qZfbqLbOtwjdzW\", \"odC4mJuYzMD3te9m\", \"q1vbq09N\", \"rKzVta\", \"ruvzwu1cC1vczZfnswLzverbBW\", \"sdfRzvbrqq\", \"rfzVqG\", \"q2XRwu1syW\", \"rKvz\", \"BgvUz3rO\", \"q2TbveLrwuTcAgrt\", \"ChjVDg90ExbL\", \"ruzZvK53BZnduq\", \"mZeZmZu4mhHRCeLisq\", \"t0HJEuzQyYTlrey4t3HRk05trtjAu0fbsvn3nKWYsxbdEwDArfjWuKzeuvzfqvLuwgGWl0Hcy2zdrwndsMDJt0DbrK1dmKPeu2X4tKffzgXtA0u\", \"y29UC3rYDwn0B3i\", \"AxrLCMf0B3i\", \"rvzrq0HrvvDqD3rHqvrJqurcwq\", \"rLzbzK5rwve\", \"zgvMAw5LuhjVCgvYDhK\", \"rLzbwePN\", \"nwjpBunPrq\", \"q2Tfre94D2y\", \"q1vJzuPOme1gz2Xr\", \"r2WWuuLervHdEhGWqLe\", \"sgXbrKvcme5buJfJshPvEezbwwnxD1vbrNHZyG\", \"rgXbve9sC00\", \"mti2otuXm2TJELzKwG\", \"q2Tvze93wq\", \"q2Tfuu1sAW\", \"mZi4ota2mdH4zuv6rKS\", \"rvvfrKLNrKm\", \"mZKWmJG5mMDdDeXRza\", \"r2XVzu9sC2q\", \"qZfrzK5Omfy\", \"C3LTyM9S\", \"sdbbzK1rwvjbqMm\", \"r0vvqLbNCW\", \"rvvfrKLN\", \"Dw5KzwzPBMvK\", \"r2WWuuLetu0\", \"rfzVAuPNqvjbuJq\", \"sdfVrez4twjcDW\", \"mZeYmdaXnM9PvvPezq\", \"zNvUy3rPB24\"];\n" +
-//     "return (e = function () {\n" +
-//     "return r;\n" +
-//     "})();\n" +
-//     "}\n" +
-//     "\n" +
-//     "console.log(e(\"dadasd\"))"
-// code = "var ji = {\"y\":90, \"ds\":78}\nvar m = 'y';console.log(ji[m])"
-// code = "var a = 0;\n" +
-//     "var b = 1;\n" +
-//     "switch (a){\n" +
-//     "    case 0:\n" +
-//     "        console.log(\"0\");\n" +
-//     "    case b:\n" +
-//     "        console.log(\"1\")\n" +
-//     "        break\n" +
-//     "    case 2:\n" +
-//     "        console.log(2);\n" +
-//     "}"
-// code = "var a = 1;console.log(a.toString());"
-// code = "var a = 10;var b = {'c':100}; a += b.c;console.log(a);"
-// code = "var a = 1; a ? console.log(1) : console.log(2);console.log('end');"
-// code = "typeof module === \"object\" && typeof module.exports === \"object\""
-// code = "var ji = {\"y\":90, \"ds\":78}\n" +
-//     "for (var i in ji){\n" +
-//     "console.log(zcj);console.log(i);\n" +
-//     "}"
-// code = "var i = 0,length = 20;for(;i < length;i++){ console.log(i);if (i < 10) { continue; } else { break;}  }";
-// code = "var i = 0,length = 20;for(;i < length;){ i++;console.log(i);if (i < 10) { continue; } else if ( i > 50 ) { break } }console.log('end')";
-// code = "var i = 0,length = 20;for(;;){ i++;console.log(i);if (i < 10) { continue; } else if ( i > 50 ) { break }  } console.log('end')";
-// code = "var i = 0,length = 20;for(;;i++){ console.log(i);if (i < 10) { continue; } else if ( i > 50 ) { break }  } console.log('end')";
-// code = "typeof module === \"object\" && typeof module.exports === \"object\" && console.log(1) || console.log('a')"
-// code = "function a(){try{var a; return (a = 100);}catch(e){}}console.log(a());"
-// code = "var d;function a(){function b(a){console.log(a);d = a;} return b;} a()(1);console.log(d);"
-// code = "function a(){console.log('a',arguments[0]);function b(){ " +
-//     "console.log('b call => ',arguments[0]);}b(55555555555);console.log('a',arguments[0],arguments[1]);}a(4,5);"
-// code = "function a(){var target = arguments[0] || {};console.log(target);if(target = 1){console.log(target)}}a({'a':'a'});"
-// code = "var target = {'a':'b'};var a = function(){console.log('a')};a.fn = a.prototype;a.ex = a.fn.ex = function(){console.log('ex')};" +
-//     "        if (typeof target !== \"object\" && !a.ex(target)) {\n" +
-//     "            target = {};\n" +
-//     "        }" +
-//     "console.log(typeof target !== \"object\" && !a.ex(target));console.log(target);console.log(typeof target === \"boolean\");"
-// code = "var a = {\n" +
-//     "  'b': 1,\n" +
-//     "  'a': Array.isArray || 1,\n" +
-//     "  'c': '123'\n" +
-//     "}\n" +
-//     "console.log(a);"
-// code = "console.log(typeof module === \"object\" && typeof module.exports === \"object\");"
-// code = "for (var zcj = Object.keys({\n" +
-//     "      \"submit\": true,\n" +
-//     "      \"change\": true,\n" +
-//     "      \"focusin\": true\n" +
-//     "    }), zcj1 = 0; zcj1 < zcj.length; zcj1++) {\n" +
-//     "      var i = zcj[zcj1];console.log(i);}"
-// code = "function assert(func){func(123);}assert((function(a){console.log(a)}));"
-// code = "function a(){return 1 ? 1 == 2 && 3 : 4;}console.log(a());"
-// code = "var b = 0;function a(c){return 1 && c;}for(var i = 0;i < 100;i++){b += a(i);console.log(b);}"
-// code = "var a = b = c = 1; a = {}; b = c = a.a = 100;console.log(a,b,c)"
-// code = "var structure={},dataType='1';(structure[dataType] = structure[dataType] || []).push(5);console.log(structure)"
-// code = "var jQuery = {fn:{}};\n" +
-//     "var init = jQuery.fn.init = function (selector, context){ console.log(arguments[0])};console.log(init);"
-// code = "var a = setTimeout(function(){console.log(123)});console.log('a',a);"
-// code = "var wait = undefined,jQuery={readyWait:1};jQuery['a'] = 5;if (wait !== true && --jQuery.readyWait > 0) {\n" +
-//     "                console.log('bug');\n" +
-//     "            }console.log(jQuery);"
-// code = "var a = 1;console.log(--a);"
-// code = "var e;(e = function aaa(){console.log(aaa);})();"
-// code = "var a = 0; console.log(a); var e = !0 ? (a = 10) : 5;console.log(e);console.log(a);"
-// code = "var a = {'key':1};var deep;var q = {};" +
-//     "if (a !== undefined) {\n" +
-//     "        (q['key'] ? target : deep || (deep = {}))['key'] = a['key'];\n" +
-//     "      }" +
-//     "console.log(a);console.log(deep);"
-// code = "var e = {};    \n" +
-//     "(e.a = function () {\n" +
-//     "console.log(this);\n" +
-//     "})();"
-// code = "var b,se = {};if(true){(b = se.aa = {'a':1,'c':'aaa','dd':{'ccc':'123'}}).dd.m = b.dd.ccc;console.log(b);}"
-// code = "console.log(String.fromCharCode.apply(undefined,[99,99,99]));"
-// code = "for(var i = 0; ;){\n" +
-//     "   console.log(i);\n" +
-//     "   i++;\n" +
-//     "if (i == 7)    {try{console.log('zcj1');continue;}catch(e){console.log(e);}}\n" +
-//     "else if(i == 9){try{console.log('zcj');break;}catch(e){console.log(e);break}}\n" +
-//     "}console.log('end')"
-// code = "var b,se = {};(function(){console})(),(b = se.aa = {'a':1,'c':'aaa','dd':{'ccc':'123'}}).dd.a.m = b.dd.c.ccc;"
-
-
-// code = fs.readFileSync("./jquery.js") + ''
-// code = fs.readFileSync("./md5.js") + ''
-// code = fs.readFileSync("./CryptoJs.js") + ''
-// code = fs.readFileSync("./test1.js") + ''
-code = fs.readFileSync("./test.js") + ''
-// code = fs.readFileSync("./test_out.js") + ''
-
-// code = fs.readFileSync("./vm.js") + ''
-// code = fs.readFileSync("./vmp.js") + ''
+// 选择js进行加密
+// code = fs.readFileSync("./test/jquery.js") + ''
+code = fs.readFileSync("./test/md5.js") + ''
+// code = fs.readFileSync("./test/CryptoJs.js") + ''
+// code = fs.readFileSync("./test/test.js") + ''
+// code = fs.readFileSync("./test/test_out.js") + ''
 
 
 var ast = parse(code);
@@ -1531,13 +1409,14 @@ ast = transform_js(ast);
 traverse(ast, test);
 opcode = backfill_opcode(opcode, mode.backfill_CONSTANT, OPCODE.PUSH_CONSTANT);
 fs.writeFileSync("./opcode.txt", JSON.stringify(opcode));
-fs.writeFileSync("./test_out.js", generator(ast).code);
+fs.writeFileSync("./test/test_out.js", generator(ast).code);
 console.log("翻译耗时 -> ", +new Date() - a);
 
 // var opcode_str = opcode.map((item) =>{ return String.fromCharCode(item+32)}).join('');
 // fs.writeFileSync("./opcode.txt", opcode_str);
 // console.log(obj);
 
+// 打印对象名称对应的数字
 // for (var i in identifier_binding_track) {
 //     console.log(identifier_binding_track[i].reNameId, " => ", identifier_binding_track[i].oldName);
 // }
@@ -1878,6 +1757,7 @@ const push_to_push2 = {
 
 var func_name_track = {};
 var _ = [];
+
 /* 复制vm代码 */
 const copy_vm_function = {
     FunctionDeclaration(path) {
@@ -1920,7 +1800,7 @@ const copy_vm_function = {
         path.stop();
     }
 }
-
+/* 我也忘记干嘛用的了 */
 const replace_vm_function = {
     FunctionDeclaration(path) {
         if (!(path.node.id.name === "vm_enter")) return;
@@ -2274,6 +2154,7 @@ const return_opcode = {
 }
 /* y = h &= d; -> y = h = h & d; */
 const noname = {
+    // 想不到用啥名称, 就用noname
     AssignmentExpression(path) {
         var operator = path.node.operator;
         if (operator !== "=") {
@@ -2334,7 +2215,6 @@ const delete_code = {
     }
 }
 
-// var vm_code = fs.readFileSync("./vm_enter.js") + '';
 function new_vmp_code() {
     a = +new Date();
 
@@ -2376,8 +2256,7 @@ function new_vmp_code() {
     // traverse(ast, noname1);
     // vmp_code = generator(ast).code;
 
-    fs.writeFileSync("./vmp_out.js", vmp_code);
-
+    fs.writeFileSync("./out/vmp_out.js", vmp_code);
     console.log("obfuscate混淆(压缩)耗时 -> ", +new Date() - a);
 
 }
@@ -2389,7 +2268,6 @@ if (vmp_turn) {
     vmp_code = vmp_code.replace('fs.readFileSync("./opcode.txt") + \'\'', JSON.stringify(opcode));
     fs.writeFileSync("./vmp_out.js", vmp_code);
 }
-
 
 /* 以下都是废弃的 */
 
@@ -2421,7 +2299,7 @@ const fill_call_params = {
         }
     },
 }
-/* 函数重命名 巨慢,这个rename*/
+/* 函数重命名 巨慢,这个rename */
 const rename_function = {
     FunctionDeclaration(path) {
         if (!(path.node.id.name === "vm_enter")) return;
