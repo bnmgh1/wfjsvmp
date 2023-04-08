@@ -1384,43 +1384,6 @@ if (turn) {
     expand_opcode(times);
 }
 
-// 选择js进行加密
-// code = fs.readFileSync("./test/jquery.js") + ''
-code = fs.readFileSync("./test/md5.js") + ''
-// code = fs.readFileSync("./test/CryptoJs.js") + ''
-// code = fs.readFileSync("./test/test.js") + ''
-// code = fs.readFileSync("./test/test_out.js") + ''
-
-
-var ast = parse(code);
-var opcode = [];
-const test = {
-    Program(path) {
-        // opcode = generate(path);
-        for (let i = 0; i < path.node.body.length; i++) {
-            opcode = opcode.concat(generate(path.get('body')[i]));
-        }
-        // console.log(opcode);
-    }
-}
-
-var a = +new Date();
-ast = transform_js(ast);
-traverse(ast, test);
-opcode = backfill_opcode(opcode, mode.backfill_CONSTANT, OPCODE.PUSH_CONSTANT);
-fs.writeFileSync("./opcode.txt", JSON.stringify(opcode));
-fs.writeFileSync("./test/test_out.js", generator(ast).code);
-console.log("翻译耗时 -> ", +new Date() - a);
-
-// var opcode_str = opcode.map((item) =>{ return String.fromCharCode(item+32)}).join('');
-// fs.writeFileSync("./opcode.txt", opcode_str);
-// console.log(obj);
-
-// 打印对象名称对应的数字
-// for (var i in identifier_binding_track) {
-//     console.log(identifier_binding_track[i].reNameId, " => ", identifier_binding_track[i].oldName);
-// }
-
 
 /* vm专用混淆函数 */
 
@@ -2261,13 +2224,53 @@ function new_vmp_code() {
 
 }
 
+// 选择js进行加密
+// code = fs.readFileSync("./test/jquery.js") + ''
+code = fs.readFileSync("./test/md5.js") + ''
+// code = fs.readFileSync("./test/CryptoJs.js") + ''
+// code = fs.readFileSync("./test/test.js") + ''
+// code = fs.readFileSync("./test/test_out.js") + ''
+
+
+var ast = parse(code);
+var opcode = [];
+const test = {
+    Program(path) {
+        // opcode = generate(path);
+        for (let i = 0; i < path.node.body.length; i++) {
+            opcode = opcode.concat(generate(path.get('body')[i]));
+        }
+        // console.log(opcode);
+    }
+}
+
+var a = +new Date();
+ast = transform_js(ast);
+traverse(ast, test);
+opcode = backfill_opcode(opcode, mode.backfill_CONSTANT, OPCODE.PUSH_CONSTANT);
+// 字节码保存下来
+fs.writeFileSync("./opcode.txt", JSON.stringify(opcode));
+// 经过ast处理过后的js
+fs.writeFileSync("./test/test_out.js", generator(ast).code);
+console.log("翻译耗时 -> ", +new Date() - a);
+
+// 是否对解释器进行混淆
 if (vmp_turn) {
     new_vmp_code();
 } else {
     var vmp_code = fs.readFileSync("./new_vm_enter.js") + '';
     vmp_code = vmp_code.replace('fs.readFileSync("./opcode.txt") + \'\'', JSON.stringify(opcode));
-    fs.writeFileSync("./vmp_out.js", vmp_code);
+    fs.writeFileSync("./out/vmp_out.js", vmp_code);
 }
+
+
+// console.log(obj);
+
+// 打印对象名称对应的数字
+// for (var i in identifier_binding_track) {
+//     console.log(identifier_binding_track[i].reNameId, " => ", identifier_binding_track[i].oldName);
+// }
+
 
 /* 以下都是废弃的 */
 
