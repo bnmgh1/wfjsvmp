@@ -3,20 +3,6 @@ var {window} = new JSDOM(`<!DOCTYPE html><p>Hello world</p>`);
 global["window"] = window;
 fs = require("fs");
 
-// zcj_console = console.log;
-// console.log = function () {
-//     try{
-//         if (arguments[0] === window) {
-//         debugger
-//     }
-//     }
-//     catch (e){
-//
-//     }
-//
-//     return zcj_console.apply(undefined, arguments);
-// }
-
 var OPCODE = {
     PASS: 11, // 这是个无用字节码,不作任何操作
     PUSH_NUM: 12,
@@ -326,20 +312,7 @@ var OPCODE1 = {
         // };
 
         for (; ;) {
-            // g = opcode[index++];
             g = opcode[index++];
-            // console.log(g, "对应的指令 =>", get_key(OPCODE, g), " , 下一条指令 =>", opcode[index] , " index => " , index - 1);
-
-            // if (!get_key(OPCODE, g)) {
-            //     debugger
-            // }
-
-            // console.log(get_key(OPCODE, g));
-
-            // if (vm_stack.$0 === -1) {
-            //     console.log("堆栈索引都到-1了！！gg");
-            //     debugger;
-            // }
 
             if (Number.isNaN(g) || !g) {
                 break
@@ -435,15 +408,6 @@ var OPCODE1 = {
 
                     d = vm_find_constant(d, h);
 
-                    // switch (y) {
-                    //     case "++":
-                    //         d[h]++;
-                    //         break
-                    //     case "--":
-                    //         d[h]--;
-                    //         break
-                    // }
-
                     y == symbol1 ? d[h]++ : symbol2 == y && d[h]--;
                     break
                 case OPCODE.NEW_ARRAY:
@@ -469,7 +433,6 @@ var OPCODE1 = {
                     /* 对象, key, 将值压入堆栈 */
                     y = vm_get_value();
                     d = vm_get_value();
-                    // h = d[y];
                     h = y[d];
                     // h = vm_get_value()[vm_get_value()];
                     vm_push(h);
@@ -480,7 +443,6 @@ var OPCODE1 = {
                     y = vm_get_value();
                     d = vm_get_value();
                     h = vm_get_value();
-                    // h[d] = y;
                     d[h] = y;
                     vm_push_2(y);
                     /* 这样更具迷惑性 */
@@ -527,7 +489,6 @@ var OPCODE1 = {
                     //     //     d = h.apply(y, d);
                     //     // }
                     //     // vm_push(d);
-                    //     /* 方法调用管你要不要值,我都直接push到堆栈里呢 */
                     //
                     // }
                     h === void 0 ? vm_push_fake_2(d) : h.hasOwnProperty("$0") ? (d = h.apply(y, d), vm_push(d)) :
@@ -1054,7 +1015,6 @@ var OPCODE1 = {
             }
         }
     }
-    // var opcode = eval();
     /* collect 存放for循环test 后 IS_TRUE的索引 */
     vm_enter.apply(constant.window = this, [opcode, 0, constant, void 0, 0]);
 })(constant = {"$_jsvmp": true}, fs.readFileSync("./opcode.txt") + '');

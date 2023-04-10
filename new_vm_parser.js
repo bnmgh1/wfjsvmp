@@ -296,7 +296,7 @@ function generate(node) {
             opcode.push(len);
             break
         case "ObjectProperty":
-            /* 要不就直接提取var b = {"a":"c"} 他的key, b["a"] = "c"; 酱紫容易写 他妈的 , 不写逻辑了 */
+            /* 要不就直接提取var b = {"a":"c"} 他的key, b["a"] = "c"; 酱紫容易写 他妈的, 不写逻辑了 */
             var key_opcode = generate(node.get("key"));
             key_opcode = delete_opcode(key_opcode, mode.backfill_identifier);
             var value_opcode = generate(node.get("value"));
