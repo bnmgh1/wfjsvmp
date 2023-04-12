@@ -18,7 +18,7 @@ var OPCODE = {
     PUSH_NULL: 14,
     PUSH_UNDEFINED: 15,
 
-    PUSH_WINDOW: 65, // 主要是this可能是构造器,导致这个this不是window了.
+    PUSH_WINDOW: 65, // 主要是this可能是构造函数,导致这个this不是window了.
     PUSH_VAR: 66, // 将变量池里的变量压入栈
     MOV_VAR: 67,  // 对变量进行赋值
     PUSH_THIS: 68, // push this => 泛指window
@@ -274,8 +274,8 @@ function generate(node) {
                 opcode.push(OPCODE.PUSH_UNDEFINED);
             } else {
                 opcode = opcode.concat(generate(node.get("init")));
+                opcode = backfill_opcode(opcode, mode.backfill_identifier, OPCODE.PUSH_VAR);
             }
-            opcode = backfill_opcode(opcode, mode.backfill_identifier, OPCODE.PUSH_VAR);
             opcode.push(OPCODE.MOV_VAR);
             opcode.push(OPCODE.DECREMENT_STACK);
             break
@@ -340,7 +340,6 @@ function generate(node) {
         case "UnaryExpression":
             var operator = node.node.operator;
             if (operator === "delete") {
-                // opcode = opcode.concat(backfill_opcode(generate(node.get("argument")), mode.backfill_member_expression, OPCODE.PASS));
                 opcode = opcode.concat(delete_opcode(generate(node.get("argument")), mode.backfill_member_expression));
                 opcode.push(OPCODE.DELETE)
             } else {
@@ -656,6 +655,7 @@ function generate(node) {
             // opcode = opcode.concat(object_opcode);
             opcode = opcode.concat(property_opcode);
             opcode = opcode.concat(object_opcode);
+            opcode = backfill_opcode(opcode, mode.backfill_member_expression, OPCODE.GET_OBJ);
             /* push get 还是 set */
             opcode.push(mode.backfill_member_expression);
             break
@@ -993,6 +993,7 @@ function generate(node) {
             /**
              * var patt = /runoob/i => new RegExp("runoob","i"); 用AST直接转得了
              */
+            console.log("RegExpLiteral 节点未实现");
             break
         case "ConditionalExpression":
             var test_opcode = generate(node.get("test"));
@@ -1013,7 +1014,6 @@ function generate(node) {
             var right_opcode = generate(node.get("right"));
             opcode = opcode.concat(left_opcode);
             opcode.push(OPCODE.IS_TRUE);
-            /* 我真的是判断一大堆,判断nmb的 不判断了, 爱用不用,不用也给我在堆栈里趴着 cnm的 */
             // var parent_type = "" +
             //     "ArrayExpression|ForInStatement|NewExpression|ForStatement|LogicalExpression|AssignmentExpression|ConditionalExpression|VariableDeclarator" +
             //     "|ObjectProperty|UnaryExpression|BinaryExpression|IfStatement|" +
@@ -2207,13 +2207,11 @@ function new_vmp_code() {
     // traverse(ast, replace_vm_call);
 
     a = +new Date();
-
     var vmp_code = generator(ast).code;
     vmp_code = vmp_code.replace('fs.readFileSync("./opcode.txt") + \'\'', JSON.stringify(opcode));
 
     const {obfuscate} = require('./vm_obfuscate.js');
     vmp_code = obfuscate(vmp_code);
-
 
     // ast = parse(vmp_code);
     // traverse(ast, noname1);
@@ -2226,7 +2224,8 @@ function new_vmp_code() {
 
 // 选择js进行加密
 // code = fs.readFileSync("./test/jquery.js") + ''
-code = fs.readFileSync("./test/md5.js") + ''
+code = fs.readFileSync("./test/jquery_2.js") + ''
+// code = fs.readFileSync("./test/md5.js") + ''
 // code = fs.readFileSync("./test/CryptoJs.js") + ''
 // code = fs.readFileSync("./test/test.js") + ''
 // code = fs.readFileSync("./test/test_out.js") + ''
@@ -2262,7 +2261,6 @@ if (vmp_turn) {
     vmp_code = vmp_code.replace('fs.readFileSync("./opcode.txt") + \'\'', JSON.stringify(opcode));
     fs.writeFileSync("./out/vmp_out.js", vmp_code);
 }
-
 
 // console.log(obj);
 

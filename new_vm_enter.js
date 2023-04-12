@@ -184,6 +184,34 @@ var OPCODE1 = {
         //     return opcode[index++];
         // }
 
+        function vm_try_catch(track) {
+            d = track[0] , y = track[1];
+            /* 这里多了2 try + slice 导致的index+2 */
+            switch (d) {
+                case OPCODE.BREAK:
+                    index += y;
+                    if (index > op_len) {
+                        // console.log("try break 超出当前opcode字节码数组长度~ return 上一层");
+                        return [OPCODE.BREAK, y];
+                    }
+                    break
+                case OPCODE.CONTINUE:
+                    index -= y;
+                    if (index < 0 || index > op_len) {
+                        // console.log("try continue 超出当前opcode字节码数组长度~ return 上一层");
+                        return [OPCODE.CONTINUE, y];
+                    }
+                    break
+                case 0:
+                    return h;
+                default:
+                    (function () {
+                        debugger;
+                    })();
+                    console.log("try catch 非BREAK CONTINUE RETURN 指令返回 => return ", h);
+            }
+        }
+
         function vmExpression_single_calc(symbol, opNum1) {
             switch (symbol) {
                 case "!":
@@ -318,6 +346,9 @@ var OPCODE1 = {
                 break
             }
             switch (g) {
+                case OPCODE.PASS:
+                    vm_push_fake_1(void 0);
+                    break
                 case OPCODE.PUSH_WINDOW:
                     vm_push(Wi);
                     break
@@ -348,9 +379,6 @@ var OPCODE1 = {
                 case OPCODE.PUSH_VAR:
                     d = vm_get_value();
                     y = vm_get_value();
-
-                    // console.log("push key => ", y);
-
                     // if (d === undefined || y === undefined || d[y] === undefined) {
                     //     vm_push(undefined);
                     //     // console.log(" 对象 => ", !!d && d.toString(), " key => ", y)
@@ -358,6 +386,7 @@ var OPCODE1 = {
                     // } else d = vm_find_constant(d, y);
                     // vm_push(d[y]);
 
+                    // d是undefined是有问题的应该
                     d === undefined || y === undefined || d[y] === undefined ? vm_push(undefined) : (d = vm_find_constant(d, y) , vm_push(d[y]));
                     break
                 case OPCODE.MOV_VAR:
@@ -553,9 +582,6 @@ var OPCODE1 = {
                         return [OPCODE.CONTINUE, y];
                     }
                     break
-                case OPCODE.PASS:
-                    vm_push_fake_1(void 0);
-                    break
                 case OPCODE.TRUE:
                     h = void 0;
                     y = !h;
@@ -577,31 +603,7 @@ var OPCODE1 = {
                         d += y.length + 1;
                         h = vm_enter.apply(this, [y, 0, vm_constant, vm_stack, vm_stack.$0]);
                         if (Ar.isArray(h)) {
-                            d = h[0] , y = h[1];
-                            /* 这里多了2 try + slice 导致的index+2 */
-                            switch (d) {
-                                case OPCODE.BREAK:
-                                    index += y;
-                                    if (index > op_len) {
-                                        // console.log("try break 超出当前opcode字节码数组长度~ return 上一层");
-                                        return [OPCODE.BREAK, y];
-                                    }
-                                    break
-                                case OPCODE.CONTINUE:
-                                    index -= y;
-                                    if (index < 0 || index > op_len) {
-                                        // console.log("try continue 超出当前opcode字节码数组长度~ return 上一层");
-                                        return [OPCODE.CONTINUE, y];
-                                    }
-                                    break
-                                case 0:
-                                    return h;
-                                default:
-                                    (function () {
-                                        debugger;
-                                    })();
-                                    console.log("try 非BREAK CONTINUE RETURN 指令返回 => return ", h);
-                            }
+                            return vm_try_catch(h);
                         }
                     } catch (e) {
                         index = d + 2;
@@ -612,31 +614,7 @@ var OPCODE1 = {
                         m = vm_slice();
                         h = vm_enter.apply(this, [m, 0, vm_constant, vm_stack, vm_stack.$0]);
                         if (Ar.isArray(h)) {
-                            d = h[0] , y = h[1];
-                            /* 这里多了2 try + slice 导致的index+2 */
-                            switch (d) {
-                                case OPCODE.BREAK:
-                                    index += y;
-                                    if (index > op_len) {
-                                        // console.log("try break 超出当前opcode字节码数组长度~ return 上一层");
-                                        return [OPCODE.BREAK, y];
-                                    }
-                                    break
-                                case OPCODE.CONTINUE:
-                                    index -= y;
-                                    if (index < 0 || index > op_len) {
-                                        // console.log("try continue 超出当前opcode字节码数组长度~ return 上一层");
-                                        return [OPCODE.CONTINUE, y];
-                                    }
-                                    break
-                                case 0:
-                                    return h;
-                                default:
-                                    (function () {
-                                        debugger;
-                                    })();
-                                    console.log("try 非BREAK CONTINUE RETURN 指令返回 => return ", h);
-                            }
+                            return vm_try_catch(h);
                         }
                     } finally {
                         y = opcode[index++];
@@ -650,31 +628,7 @@ var OPCODE1 = {
                             m = vm_slice();
                             h = vm_enter.apply(this, [m, 0, vm_constant, vm_stack, vm_stack.$0]);
                             if (Ar.isArray(h)) {
-                                d = h[0] , y = h[1];
-                                /* 这里多了2 try + slice 导致的index+2 */
-                                switch (d) {
-                                    case OPCODE.BREAK:
-                                        index += y;
-                                        if (index > op_len) {
-                                            // console.log("try break 超出当前opcode字节码数组长度~ return 上一层");
-                                            return [OPCODE.BREAK, y];
-                                        }
-                                        break
-                                    case OPCODE.CONTINUE:
-                                        index -= y;
-                                        if (index < 0 || index > op_len) {
-                                            // console.log("try continue 超出当前opcode字节码数组长度~ return 上一层");
-                                            return [OPCODE.CONTINUE, y];
-                                        }
-                                        break
-                                    case 0:
-                                        return h;
-                                    default:
-                                        (function () {
-                                            debugger;
-                                        })();
-                                        console.log("try 非BREAK CONTINUE RETURN 指令返回 => return ", h);
-                                }
+                                return vm_try_catch(h);
                             }
                         } else index--;
                     }
@@ -987,7 +941,6 @@ var OPCODE1 = {
                     vm_push(y);
                     break;
 
-
                 case OPCODE1["~"]:
                     d = vm_get_value();
                     h = vm_get_value_fake();
@@ -1015,6 +968,7 @@ var OPCODE1 = {
             }
         }
     }
+
     /* collect 存放for循环test 后 IS_TRUE的索引 */
     vm_enter.apply(constant.window = this, [opcode, 0, constant, void 0, 0]);
 })(constant = {"$_jsvmp": true}, fs.readFileSync("./opcode.txt") + '');
